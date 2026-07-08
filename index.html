@@ -74,7 +74,7 @@
 
         /* Drag & Drop Fixes */
         .drop-zone { position: relative; border: 2px dashed #cbd5e1; border-radius: 1rem; padding: 2.5rem; text-align: center; transition: all 0.2s ease; cursor: pointer; background-color: #f8fafc; }
-        .drop-zone * { pointer-events: none; } /* Mencegah elemen dalam dropzone memblokir event dragleave */
+        .drop-zone * { pointer-events: none; }
         .drop-zone.drag-active { border-color: #6366f1 !important; background-color: #e0e7ff !important; }
         #drop-zone-wip.drag-active { border-color: #14b8a6 !important; background-color: #ccfbf1 !important; }
     </style>
@@ -122,7 +122,7 @@
         </div>
     </div>
 
-    <!-- Navbar Restructured -->
+    <!-- Navbar -->
     <nav class="bg-white border-b border-bento-border px-4 py-2 flex items-center justify-between z-20 shrink-0 shadow-sm">
         <div class="flex items-center gap-4">
             <div class="flex items-center gap-2 mr-2">
@@ -156,7 +156,7 @@
         </div>
     </nav>
 
-    <!-- Set Outstanding (Global Control for ALL tabs) -->
+    <!-- Global Threshold Control -->
     <div class="bg-amber-50 border-b border-amber-200 px-4 py-2 flex flex-col md:flex-row justify-between items-center shrink-0 shadow-sm hidden gap-2" id="global-threshold-bar">
         <div class="flex items-center gap-2">
             <i data-lucide="target" class="w-4 h-4 text-amber-600"></i>
@@ -174,6 +174,7 @@
         </div>
     </div>
 
+    <!-- MAIN SCROLL AREA -->
     <main class="flex-1 overflow-auto p-3 flex flex-col gap-4 bg-gray-100/50" id="main-scroll-area">
         
         <!-- ================= OVERVIEW VIEW (DASHBOARD) ================= -->
@@ -181,18 +182,16 @@
             <!-- OVERVIEW EXPORT WRAPPER -->
             <div id="view-overview-export-wrapper" class="w-full flex flex-col gap-4 bg-gray-100/50 p-2 rounded-xl">
                 
-                <!-- Category Overview Context Filters -->
+                <!-- Category Context Filters -->
                 <div class="flex flex-col sm:flex-row justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-200 shrink-0 gap-3" data-html2canvas-ignore id="overview-export-buttons-hide">
                     <div class="flex gap-3 items-center w-full overflow-x-auto scrollbar-hide">
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1"><i data-lucide="filter" class="w-3 h-3"></i> TAMPILAN KATEGORI:</span>
-                        <div class="flex gap-1.5 bg-gray-100 p-1 rounded-lg" id="overview-cat-buttons">
-                            <!-- Injected by JS -->
-                        </div>
+                        <div class="flex gap-1.5 bg-gray-100 p-1 rounded-lg" id="overview-cat-buttons"></div>
                     </div>
                     <button onclick="downloadOverviewImage()" class="shrink-0 flex items-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-md text-[10px] font-bold shadow transition"><i data-lucide="camera" class="w-3.5 h-3.5"></i> Export Dashboard</button>
                 </div>
 
-                <!-- MASTER DATA ANALYTICS ROW -->
+                <!-- KPI CARDS -->
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3 shrink-0">
                     <div class="bento-box p-4 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white relative overflow-hidden shadow-lg border-none">
                         <i data-lucide="layers" class="w-20 h-20 absolute -right-4 -bottom-4 opacity-20"></i>
@@ -234,8 +233,9 @@
                     </div>
                 </div>
 
+                <!-- LISTS & TREND LINE -->
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 shrink-0">
-                    <!-- Left 1: Overdue List -->
+                    <!-- Overdue List -->
                     <div class="bento-box bg-white flex flex-col h-[320px] overflow-hidden">
                         <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 shrink-0 bg-red-50/30">
                             <div class="flex items-center justify-between">
@@ -247,7 +247,7 @@
                         <div id="overview-overdue-list" class="flex-1 overflow-auto flex flex-col gap-1.5 p-3"></div>
                     </div>
 
-                    <!-- Left 2: Daily Closed Log -->
+                    <!-- Closed List -->
                     <div class="bento-box bg-white flex flex-col h-[320px] overflow-hidden border-t-4 border-t-emerald-400">
                         <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 shrink-0 bg-emerald-50/30">
                             <div class="flex items-center justify-between">
@@ -259,7 +259,7 @@
                         <div id="overview-closed-list" class="flex-1 overflow-auto flex flex-col gap-1.5 p-3"></div>
                     </div>
 
-                    <!-- Right: Daily Data Trend (Health) -->
+                    <!-- Health Trend -->
                     <div class="bento-box p-5 bg-white flex flex-col h-[320px] lg:col-span-2 border-t-4 border-t-blue-400 shadow-sm">
                         <div class="mb-3 shrink-0 flex justify-between items-start">
                             <div>
@@ -272,16 +272,15 @@
                     </div>
                 </div>
 
-                <!-- Loading Trends - BESAR & DITONJOLKAN -->
+                <!-- LOADING ANALYSIS HEADER -->
                 <div class="bento-box p-5 bg-white flex flex-col w-full mt-2 shadow-sm">
                     <div class="flex justify-between items-center w-full mb-3 shrink-0 border-b border-gray-100 pb-3">
                         <div>
                             <h2 class="font-bold text-gray-800 text-lg flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5 text-brand-500"></i> Analisis Loading & Outstanding</h2>
-                            <p class="text-[11px] text-gray-500 mt-1">Area dengan latar belakang merah transparan menunjukkan batas Outstanding (Delay).</p>
+                            <p class="text-[11px] text-gray-500 mt-1">Area dengan latar belakang merah muda transparan menunjukkan batas Outstanding (Delay).</p>
                         </div>
                     </div>
 
-                    <!-- HIGHLIGHT KPI RAKSASA -->
                     <div class="flex flex-wrap lg:flex-nowrap gap-4 mb-5 shrink-0">
                         <div class="flex-1 flex flex-col bg-gray-50 border border-gray-200 px-5 py-3 rounded-xl shadow-sm">
                             <span class="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Total Load Aktif</span>
@@ -393,8 +392,6 @@
                         </div>
                         <div id="control-counter" class="text-[10px] font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-100 shadow-sm"></div>
                     </div>
-                    
-                    <!-- Tabs Periode Database Bersih -->
                     <div id="control-periode-tabs" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide"></div>
                 </div>
                 
@@ -474,29 +471,26 @@
 
     <script>
         // ==========================================
-        // 1. FIREBASE WRAPPER LOGIC DENGAN CHUNKING
+        // 1. FIREBASE WRAPPER LOGIC DENGAN CHUNKING (SEKUENSIAL & THROTTLED)
         // ==========================================
         
-        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        // MASUKKAN KONFIGURASI FIREBASE ANDA DI SINI
-        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // KONFIGURASI FIREBASE ANDA
         const firebaseConfig = {
-  apiKey: "AIzaSyDpxgbqlgCbYLKGiKmqw44DMRory_iMFBo",
-  authDomain: "e-wip-7ea42.firebaseapp.com",
-  databaseURL: "https://e-wip-7ea42-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "e-wip-7ea42",
-  storageBucket: "e-wip-7ea42.firebasestorage.app",
-  messagingSenderId: "202301603639",
-  appId: "1:202301603639:web:24c0ee15102abe3080a4b2"
-};
+            apiKey: "AIzaSyDpxgbqlgCbYLKGiKmqw44DMRory_iMFBo",
+            authDomain: "e-wip-7ea42.firebaseapp.com",
+            databaseURL: "https://e-wip-7ea42-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "e-wip-7ea42",
+            storageBucket: "e-wip-7ea42.firebasestorage.app",
+            messagingSenderId: "202301603639",
+            appId: "1:202301603639:web:24c0ee15102abe3080a4b2"
+        };
 
         let isFirebaseActive = false;
         let db = null;
         
-        if(firebaseConfig.apiKey !== "MASUKKAN_API_KEY_ANDA_DI_SINI") {
+        if(firebaseConfig.apiKey && firebaseConfig.apiKey !== "MASUKKAN_API_KEY_ANDA_DI_SINI") {
             firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
-            // Menembus blokir jaringan lokal (file:///)
             db.settings({ experimentalForceLongPolling: true });
             isFirebaseActive = true;
         }
@@ -505,23 +499,45 @@
             if (!isFirebaseActive) return;
             try { 
                 const serializedData = JSON.stringify(data); 
-                // Pecah data agar tidak terkena limit 1MB Firebase
-                const chunkSize = 800000; 
+                // Chunk size diperkecil lagi agar lebih mudah ditelan Firebase
+                const chunkSize = 400000; 
                 const chunksCount = Math.ceil(serializedData.length / chunkSize);
 
-                await db.collection("wip_dashboard").doc(key + "_meta").set({ chunks: chunksCount });
+                let retriesMeta = 3;
+                while(retriesMeta > 0) {
+                    try {
+                        await db.collection("wip_dashboard").doc(key + "_meta").set({ chunks: chunksCount });
+                        break;
+                    } catch(e) {
+                        retriesMeta--;
+                        if(retriesMeta === 0) throw e;
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                }
 
-                let promises = [];
+                // Loop Sequential Murni dengan Throttle Waktu (Mencegah Write stream exhausted)
                 for (let i = 0; i < chunksCount; i++) {
                     let chunkStr = serializedData.substring(i * chunkSize, (i + 1) * chunkSize);
-                    promises.push(db.collection("wip_dashboard").doc(key + "_" + i).set({ payload: chunkStr }));
+                    let retriesChunk = 3;
+                    while(retriesChunk > 0) {
+                        try {
+                            await db.collection("wip_dashboard").doc(key + "_" + i).set({ payload: chunkStr });
+                            break;
+                        } catch(e) {
+                            retriesChunk--;
+                            if(retriesChunk === 0) throw e;
+                            console.warn("Mencoba ulang pengiriman chunk ke-" + i, e);
+                            await new Promise(r => setTimeout(r, 1500));
+                        }
+                    }
+                    // Jeda dinamis agar koneksi Long Polling tidak kebanjiran (Throttling)
+                    await new Promise(resolve => setTimeout(resolve, 400));
                 }
-                await Promise.all(promises); 
                 
             } catch(e) { 
                 console.error("Firebase Save Error:", e); 
-                showToast("Server Cloud menolak data: " + e.message, "error"); 
-                throw e; // Hentikan eksekusi jika error, mencegah notifikasi hijau palsu
+                showToast("Server Cloud menolak data (Koneksi Penuh). Coba beberapa saat lagi.", "error"); 
+                throw e; 
             }
         }
 
@@ -576,6 +592,7 @@
         const CATEGORIES = ['ADD', 'CAT', 'REG', 'SMC', 'SMV'];
         const dateKeywords = ['STWC', 'TANGGAL', 'DATE', 'HOUSING', 'ASSEMBLING', 'VISUAL', 'CHECKER', 'FINISHING', 'PREDEL', 'RFG'];
 
+        // CHART PLUGIN: BACKGROUND AREA DELAY UNTUK VISUALISASI OUTSTANDING
         const thresholdBgPlugin = {
             id: 'thresholdBg',
             beforeDatasetsDraw: (chart) => {
@@ -608,16 +625,23 @@
             }
         };
 
+        const safeSetHTML = (id, htmlContent) => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = htmlContent;
+        };
+
+        const safeSetText = (id, textContent) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = textContent;
+        };
+
         function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast ${type}`;
+            const container = document.getElementById('toast-container'); 
+            if(!container) return;
+            const toast = document.createElement('div'); toast.className = `toast ${type}`;
             toast.innerHTML = `<div class="flex items-center gap-2"><i data-lucide="${type === 'success' ? 'check-circle' : 'info'}" class="w-4 h-4"></i>${message}</div>`;
             container.appendChild(toast); lucide.createIcons(); setTimeout(() => toast.classList.add('show'), 10);
             setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 4000);
-        }
-
-        const safeSetText = (id, text) => {
-            const el = document.getElementById(id);
-            if (el) el.innerText = text;
         }
 
         function sanitizeHeaders(headersArray) {
@@ -634,26 +658,40 @@
             let wp = String(wpStr).toUpperCase();
             if(wp.includes('E') || wp.includes('A')) return 'ADD'; if(wp.includes('C')) return 'CAT'; if(wp.includes('/')) return 'REG'; if(wp.includes('S')) return 'SMC'; if(wp.includes('-')) return 'SMV'; return 'OTHER';
         }
-        function getWPP(wpStr) { let match = String(wpStr).trim().match(/^(\d+)/); return match ? match[1] : wpStr; }
+        
+        function getWPP(wpStr) { 
+            let match = String(wpStr).trim().match(/^(\d+)/); 
+            return match ? match[1] : wpStr; 
+        }
         
         function isDateColumn(headerName) {
             let upper = String(headerName).toUpperCase();
             return dateKeywords.some(kw => upper.includes(kw));
         }
 
-        function formatExcelDateStr(value) {
+        function parseExcelDate(value) {
             if(!value) return null;
             if(typeof value === 'number') {
                 let d = new Date(Math.round((value - 25569) * 86400 * 1000));
-                if(isNaN(d)) return value;
-                return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+                if(isNaN(d.getTime())) return null;
+                return d;
             }
             if(typeof value === 'string') {
                 let parts = value.split(/[-/]/);
                 if (parts.length === 3) {
-                    if (parts[2].length === 4) { let d = new Date(parts[2], parts[1] - 1, parts[0]); return isNaN(d) ? value : String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear(); }
-                    if (parts[0].length === 4) { let d = new Date(parts[0], parts[1] - 1, parts[2]); return isNaN(d) ? value : String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear(); }
+                    if (parts[2].length === 4) { let d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])); return isNaN(d.getTime()) ? null : d; }
+                    if (parts[0].length === 4) { let d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])); return isNaN(d.getTime()) ? null : d; }
                 }
+                let d = new Date(value);
+                return isNaN(d.getTime()) ? null : d;
+            }
+            return null;
+        }
+
+        function formatExcelDateStr(value) {
+            let d = parseExcelDate(value);
+            if(d instanceof Date && !isNaN(d.getTime())) {
+                return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
             }
             return value;
         }
@@ -663,10 +701,17 @@
             return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
         }
 
+        // PERBAIKAN LOGIKA PARSING TANGGAL INDO AGAR PRESISI SAAT DIHITUNG SELISIHNYA
         function parseIndoDate(str) {
             if (!str) return 0;
-            let parts = str.split('-'); 
-            if(parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]).getTime();
+            let parts = str.split(/[-/]/); 
+            if(parts.length === 3) {
+                let d = parts[2].length === 4 
+                    ? new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0])) 
+                    : new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+                d.setHours(0,0,0,0);
+                return d.getTime();
+            }
             return 0;
         }
 
@@ -680,59 +725,16 @@
             charts[ctxId] = new Chart(el.getContext('2d'), { type: type, data: data, options: options, plugins: [thresholdBgPlugin] });
         }
 
-        // ==========================================
-        // 3. INIT & TAB LOGIC + AUTO RESET
-        // ==========================================
-        window.onload = async function() {
-            lucide.createIcons();
-            Chart.register(ChartDataLabels);
-            Chart.defaults.set('plugins.datalabels', { display: false });
+        function preventD(e) { e.preventDefault(); e.stopPropagation(); }
 
-            if (!isFirebaseActive) {
-                showToast("Firebase Belum Dikonfigurasi! Fitur penyimpanan Cloud belum berjalan.", "warning");
-                document.getElementById('loading-overlay').classList.add('hidden');
-                switchTab('master');
-                return;
-            }
-
-            const overlay = document.getElementById('loading-overlay'); overlay.classList.remove('hidden');
-            
-            globalMasterData = (await loadDB('master_data')) || [];
-            globalWipData = (await loadDB('wip_data')) || [];
-            globalShMaterials = (await loadDB('sh_materials')) || [];
-            dailyHistory = (await loadDB('daily_history')) || [];
-            globalCutoffPWKey = await loadDB('global_cutoff_key');
-            globalDelayPWKey = await loadDB('global_delay_key');
-            masterHeaders = sanitizeHeaders(await loadDB('master_headers'));
-            
-            uploadedMasterFiles = (await loadDB('uploaded_master_files')) || [];
-            uploadedWipFiles = (await loadDB('uploaded_wip_files')) || [];
-            masterHeaders.forEach(h => masterHeadersSet.add(h));
-
-            let lastWipDate = await loadDB('last_wip_date');
-            let todayStr = getTodayDateStr();
-
-            if (lastWipDate && lastWipDate !== todayStr && globalWipData.length > 0) {
-                globalWipData = [];
-                uploadedWipFiles = [];
-                await saveDB('wip_data', []);
-                await saveDB('uploaded_wip_files', []);
-                showToast("Hari baru dimulai! Data WIP kemarin telah dibersihkan otomatis.", "warning");
-            }
-
-            if(globalMasterData.length > 0) {
-                updateWipDependencies();
-                updateInputStats(); 
-                updateGlobalThresholdUI(); 
-                renderUploadedFiles();
-                try { setupControlHeaders(); } catch(e) { console.error(e); }
-                document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
-                document.getElementById('global-threshold-bar').classList.remove('hidden');
-                document.getElementById('btn-reset').classList.remove('hidden');
-                switchTab('overview');
-            } else { switchTab('master'); }
-            overlay.classList.add('hidden');
-        };
+        function readExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve({ name: file.name, data: new Uint8Array(e.target.result) });
+                reader.onerror = (e) => reject(e);
+                reader.readAsArrayBuffer(file);
+            });
+        }
 
         function renderUploadedFiles() {
             const masterList = document.getElementById('master-file-list');
@@ -792,6 +794,57 @@
             }
         }
 
+        // ==========================================
+        // 3. INIT & TAB LOGIC + AUTO RESET
+        // ==========================================
+        window.onload = async function() {
+            lucide.createIcons();
+            Chart.register(ChartDataLabels);
+            Chart.defaults.set('plugins.datalabels', { display: false });
+
+            const overlay = document.getElementById('loading-overlay'); 
+            if(overlay) overlay.classList.remove('hidden');
+
+            if (!isFirebaseActive) {
+                showToast("Firebase Gagal Konek! Cek config API.", "error");
+                if(overlay) overlay.classList.add('hidden');
+                switchTab('master');
+                return;
+            }
+            
+            globalMasterData = (await loadDB('master_data')) || [];
+            globalWipData = (await loadDB('wip_data')) || [];
+            globalShMaterials = (await loadDB('sh_materials')) || [];
+            dailyHistory = (await loadDB('daily_history')) || [];
+            globalCutoffPWKey = await loadDB('global_cutoff_key');
+            globalDelayPWKey = await loadDB('global_delay_key');
+            masterHeaders = sanitizeHeaders(await loadDB('master_headers'));
+            
+            uploadedMasterFiles = (await loadDB('uploaded_master_files')) || [];
+            uploadedWipFiles = (await loadDB('uploaded_wip_files')) || [];
+            masterHeaders.forEach(h => masterHeadersSet.add(h));
+
+            let lastWipDate = await loadDB('last_wip_date');
+            let todayStr = getTodayDateStr();
+
+            if (lastWipDate && lastWipDate !== todayStr && globalWipData.length > 0) {
+                globalWipData = []; uploadedWipFiles = [];
+                await saveDB('wip_data', []); await saveDB('uploaded_wip_files', []);
+                showToast("Hari baru dimulai! Data WIP kemarin telah dibersihkan otomatis.", "warning");
+            }
+
+            if(globalMasterData.length > 0) {
+                updateWipDependencies(); updateInputStats(); updateGlobalThresholdUI(); renderUploadedFiles();
+                try { setupControlHeaders(); } catch(e) { console.error(e); }
+                document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
+                document.getElementById('global-threshold-bar').classList.remove('hidden');
+                document.getElementById('btn-reset').classList.remove('hidden');
+                switchTab('overview');
+            } else { switchTab('master'); }
+            
+            if(overlay) overlay.classList.add('hidden');
+        };
+
         function updateWipDependencies() {
             let uniqueSet = new Set();
             globalWipData.forEach(r => {
@@ -817,7 +870,9 @@
                 }
             });
 
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const viewActive = document.getElementById(`view-${tabId}`);
+            if(viewActive) viewActive.classList.remove('hidden');
+
             let activeBtn = document.getElementById(`btn-tab-${tabId}`);
             if(activeBtn) {
                 if(tabId === 'overview') activeBtn.className = "px-3 py-1.5 rounded-md text-xs font-semibold transition bg-brand-50 text-brand-700 border border-brand-200 shadow-sm";
@@ -891,14 +946,6 @@
         // ==========================================
         // 4. MULTI-UPLOAD & PARSING LOGIC
         // ==========================================
-        function readExcelFile(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => resolve({ name: file.name, data: new Uint8Array(e.target.result) });
-                reader.onerror = (e) => reject(e);
-                reader.readAsArrayBuffer(file);
-            });
-        }
         
         const dropZoneMaster = document.getElementById('drop-zone-master'); const fileInputMaster = document.getElementById('file-input-master');
         dropZoneMaster.addEventListener('click', () => fileInputMaster.click());
@@ -923,7 +970,6 @@
                     let fileObj = await readExcelFile(file);
                     let workbook = XLSX.read(fileObj.data, {type: 'array'});
                     
-                    // Hapus data lama yang berasal dari file ini (agar tidak double jika diupload ulang)
                     globalMasterData = globalMasterData.filter(m => m._sourceFile !== file.name);
                     if(!uploadedMasterFiles.includes(file.name)) uploadedMasterFiles.push(file.name);
                     
@@ -971,11 +1017,9 @@
                                 let assyStr = String(obj['ASSY']).trim().toUpperCase();
                                 let perStr = String(obj['PERIODE'] || '').trim().toUpperCase();
                                 let wpStr = String(obj['WP'] || '').trim().toUpperCase();
-                                
                                 let uid = `${assyStr}_${perStr}_${wpStr}`;
                                 
-                                obj._uid = uid;
-                                obj._sourceFile = file.name;
+                                obj._uid = uid; obj._sourceFile = file.name;
 
                                 let existingIdx = globalMasterData.findIndex(m => m._uid === uid);
                                 if(existingIdx !== -1) {
@@ -983,16 +1027,12 @@
                                     if(!globalMasterData[existingIdx]._status) globalMasterData[existingIdx]._status = 'OPEN';
                                     updatedAssyCount++;
                                 } else {
-                                    obj._status = 'OPEN'; 
-                                    globalMasterData.push(obj);
-                                    newAssyCount++;
+                                    obj._status = 'OPEN'; globalMasterData.push(obj); newAssyCount++;
                                 }
                             }
                         }
                     }
-                } catch(err) { 
-                    console.error(err); showToast(`Error pada file ${file.name}: ` + err.message, 'error'); 
-                }
+                } catch(err) { console.error(err); showToast(`Error pada file ${file.name}`, 'error'); }
             }
             
             masterHeaders = sanitizeHeaders(Array.from(masterHeadersSet));
@@ -1031,7 +1071,6 @@
             if(globalMasterData.length === 0) { showToast('Upload Master Data (MPP) terlebih dahulu!', 'warning'); return; }
             
             const overlay = document.getElementById('loading-overlay'); overlay.classList.remove('hidden');
-            
             let todayStr = getTodayDateStr();
 
             for(let i=0; i<files.length; i++) {
@@ -1090,15 +1129,14 @@
                             let wpStr = String(obj['WP'] || '').trim().toUpperCase();
                             let uid = `${assy}_${perStr}_${wpStr}`;
                             
-                            obj._uid = uid;
-                            obj._sourceFile = file.name;
+                            obj._uid = uid; obj._sourceFile = file.name;
                             
                             let existingIdx = globalWipData.findIndex(w => w._uid === uid);
                             if(existingIdx !== -1) globalWipData[existingIdx] = obj;
                             else globalWipData.push(obj);
                         }
                     } else { showToast(`Format File WIP Salah: ${file.name}`, 'error'); }
-                } catch(err) { console.error(err); showToast(`Error WIP ${file.name}: ` + err.message, 'error'); }
+                } catch(err) { console.error(err); showToast(`Error WIP ${file.name}`, 'error'); }
             }
 
             try {
@@ -1127,7 +1165,7 @@
             });
             
             if(selCutoff && selDelay) {
-                selCutoff.innerHTML = html; selDelay.innerHTML = html;
+                safeSetHTML('cutoff-wpp-select', html); safeSetHTML('delay-wpp-select', html);
                 if(globalCutoffPWKey) selCutoff.value = globalCutoffPWKey;
                 if(globalDelayPWKey) selDelay.value = globalDelayPWKey;
             }
@@ -1137,16 +1175,15 @@
         async function updateDelayThreshold(val) { globalDelayPWKey = val; await saveDB('global_delay_key', val); refreshDashboards(); }
 
         function refreshDashboards() {
-            if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
-            if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
+            const isOverview = !document.getElementById('view-overview')?.classList.contains('hidden');
+            if(isOverview) renderOverviewDashboard();
+            const isReport = !document.getElementById('view-report')?.classList.contains('hidden');
+            if(isReport) renderReportWIP();
         }
 
         async function recalculateValidation() {
             if(!isFirebaseActive) return;
-            if (globalWipData.length === 0 || globalMasterData.length === 0) {
-                showToast('Data Master atau WIP kosong.', 'warning');
-                return;
-            }
+            if (globalMasterData.length === 0) return;
 
             let today = new Date(); today.setHours(0,0,0,0);
             let todayStr = getTodayDateStr();
@@ -1163,15 +1200,21 @@
 
             globalMasterData.forEach(masterRow => {
                 let uid = masterRow._uid;
+                
+                // PERBAIKAN LOGIKA SELISIH HARI (H+1 / H+2) DENGAN PEMBULATAN MATEMATIS
                 let stwcTime = parseIndoDate(masterRow['STWC']);
-                let stwcDateObj = stwcTime > 0 ? new Date(stwcTime) : null;
-                if (stwcDateObj) stwcDateObj.setHours(0,0,0,0);
-                let diffDays = stwcDateObj ? (todayTime - stwcDateObj.getTime()) / 86400000 : 0;
+                let diffDays = 0;
+                if(stwcTime > 0) {
+                    let stwcDateObj = new Date(stwcTime);
+                    stwcDateObj.setHours(0,0,0,0);
+                    let diffTime = todayTime - stwcDateObj.getTime();
+                    diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                }
                 
                 let wipRow = wipRowMap.get(uid);
                 let isWipCnd3 = wipRow && String(wipRow['CND'] || '').toUpperCase().includes('CND 3');
 
-                if (!wipUidSet.has(uid)) {
+                if (globalWipData.length > 0 && !wipUidSet.has(uid)) {
                     if(masterRow._status !== 'CLOSED') { masterRow._closedDate = todayStr; closedCount++; }
                     masterRow._status = 'CLOSED';
                 } else {
@@ -1194,7 +1237,6 @@
                 dailyHistory[existingHistoryIdx].cnd3 = cnd3Count + cnd2Count;
                 dailyHistory[existingHistoryIdx].open = openCount;
                 dailyHistory[existingHistoryIdx].closed = globalMasterData.filter(m=>m._status==='CLOSED').length;
-                dailyHistory[existingHistoryIdx].pct = pctOnSched;
             } else {
                 dailyHistory.push(newHistoryEntry);
             }
@@ -1203,7 +1245,7 @@
                 await saveDB('master_data', globalMasterData);
                 await saveDB('daily_history', dailyHistory);
 
-                showToast('Rekalkulasi Matriks & Server Cloud Selesai.', 'success');
+                showToast('Rekalkulasi Validasi Mutlak Selesai.', 'success');
                 refreshDashboards();
                 try { renderControlOutstanding(); } catch(e){}
             } catch(e) {}
@@ -1225,20 +1267,26 @@
             }).catch(err => { if(btns) btns.style.display = 'flex'; showToast('Gagal Export Dashboard', 'error'); });
         }
 
+        // PERBAIKAN POP-UP LIST ASSY DRILLDOWN 
         window.openDrilldownModal = function(pwKey, catName) {
             const modal = document.getElementById('drilldown-modal');
             const title = document.getElementById('drilldown-title');
-            const tbody = document.getElementById('drilldown-tbody');
             
             let [per, wpp] = pwKey.split('_');
-            title.innerText = `List Assy - Periode ${per} | WPP ${wpp} (${catName})`;
+            if(title) title.innerText = `List Assy - Periode ${per} | WPP ${wpp} (${catName})`;
             
+            let wipMap = new Map();
+            globalWipData.forEach(w => wipMap.set(w._uid, w));
+
             let filtered = globalMasterData.filter(m => {
                 if(m._status === 'CLOSED') return false; 
                 let mPer = String(m['PERIODE'] || '').trim();
-                let mWpp = getWPP(String(m['WP'] || '').trim());
-                let mCat = getCategoryName(m['WP']);
-                if(mPer !== per || mWpp !== wpp) return false;
+                let mWppStr = String(m['WP'] || '').trim();
+                let mWpp = getWPP(mWppStr);
+                let mCat = getCategoryName(mWppStr);
+                
+                // Mencegah mismatch WPP 05 vs 5
+                if(mPer !== per || parseInt(mWpp) !== parseInt(wpp)) return false;
                 if(catName !== 'ALL' && catName !== 'GRAND' && mCat !== catName) return false;
                 return true;
             });
@@ -1249,25 +1297,36 @@
             });
 
             let totalList = filtered.length;
-            let totalCct = filtered.reduce((sum, m) => sum + (parseFloat(m['TOTAL CCT']) || 0), 0);
-            document.getElementById('drilldown-subtitle').innerHTML = `Total List Assy: <strong>${totalList}</strong> &nbsp;|&nbsp; Total CCT: <strong>${totalCct.toLocaleString()}</strong>`;
+            // Menjumlahkan PP CCT dari WIP agar sama persis dengan tinggi batang grafik
+            let totalCct = filtered.reduce((sum, m) => {
+                let w = wipMap.get(m._uid);
+                let val = w && w['PP CCT'] ? parseFloat(w['PP CCT']) : parseFloat(m['TOTAL CCT']);
+                return sum + (val || 0);
+            }, 0);
+            
+            safeSetHTML('drilldown-subtitle', `Total List Assy: <strong class="text-gray-800">${totalList}</strong> &nbsp;|&nbsp; Total CCT Aktual: <strong class="text-gray-800">${totalCct.toLocaleString()}</strong>`);
 
             let html = '';
             filtered.forEach(m => {
                 let badge = m._status === 'CND 3' ? '<span class="bg-red-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CND 3</span>' : 
                             m._status === 'CND 2' ? '<span class="bg-amber-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CND 2</span>' :
                             '<span class="bg-blue-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">OPEN</span>';
-                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition"><td class="p-2.5 text-center">${badge}</td><td class="p-2.5 font-bold text-gray-800">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500">${m.WP||'-'}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center">${m.QTY||'-'}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${m['TOTAL CCT']||'-'}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px]">${m.CUSTOMER||'-'}</td></tr>`;
+                
+                let w = wipMap.get(m._uid);
+                let cctDisplay = w && w['PP CCT'] ? w['PP CCT'] : (m['TOTAL CCT'] || '-');
+
+                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition"><td class="p-2.5 text-center">${badge}</td><td class="p-2.5 font-bold text-gray-800">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500">${m.WP||'-'}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center">${m.QTY||'-'}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${cctDisplay}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px]">${m.CUSTOMER||'-'}</td></tr>`;
             });
             
             if(filtered.length === 0) html = '<tr><td colspan="7" class="text-center p-6 text-gray-400 font-medium">Tidak ada data aktif di WPP ini.</td></tr>';
             
-            tbody.innerHTML = html;
-            modal.classList.remove('hidden');
+            safeSetHTML('drilldown-tbody', html);
+            if(modal) modal.classList.remove('hidden');
         }
 
         window.closeDrilldown = function() {
-            document.getElementById('drilldown-modal').classList.add('hidden');
+            const modal = document.getElementById('drilldown-modal');
+            if(modal) modal.classList.add('hidden');
         }
 
         function renderOverviewDashboard() {
@@ -1391,7 +1450,6 @@
                 }
             }
 
-            // HITUNG MATRIKS & DATA TREN BERDASARKAN FILTER TAB
             let wppSums = {}; let catSums = { ADD:{}, CAT:{}, REG:{}, SMC:{}, SMV:{} };
             let catStats = { ADD: {load:0, delay:0, onsched:0, sh:0}, CAT: {load:0, delay:0, onsched:0, sh:0}, REG: {load:0, delay:0, onsched:0, sh:0}, SMC: {load:0, delay:0, onsched:0, sh:0}, SMV: {load:0, delay:0, onsched:0, sh:0} };
             let kpiTotalLoad = 0; let kpiDelay = 0; let kpiOnSched = 0; let kpiSH = 0;
@@ -1442,6 +1500,21 @@
                         else stackedData[catKey.toLowerCase()].sched[wppIndex] += ppCct;
                     }
                 });
+
+                // UPDATE MEMORY HISTORY
+                let existingHistoryIdx = dailyHistory.findIndex(h => h.dateKey === todayStr);
+                let currentGlobalPct = kpiTotalLoad > 0 ? (kpiOnSched / kpiTotalLoad) * 100 : 0;
+                let currentCatPct = {};
+                CATEGORIES.forEach(c => {
+                    let t = catStats[c].load;
+                    currentCatPct[c] = t > 0 ? (catStats[c].onsched / t) * 100 : 0;
+                });
+
+                if (existingHistoryIdx !== -1) {
+                    dailyHistory[existingHistoryIdx].pct = currentGlobalPct;
+                    dailyHistory[existingHistoryIdx].catPct = currentCatPct;
+                    if(isFirebaseActive) saveDB('daily_history', dailyHistory); 
+                }
             }
 
             // RENDER DAILY TREND 
@@ -1458,8 +1531,7 @@
             let intercept = n > 0 ? (sumY - slope * sumX) / n : parseFloat(pctData[0] || 0);
             let trendlineData = []; for (let i = 0; i < n; i++) trendlineData.push((slope * i + intercept).toFixed(2));
 
-            const titleCatEl = document.getElementById('daily-trend-title-cat');
-            if (titleCatEl) titleCatEl.innerText = activeOverviewCat;
+            safeSetText('daily-trend-title-cat', activeOverviewCat);
 
             createOrUpdateChart('chartDailyTrend', 'line', {
                 labels: dailyLabels,
@@ -1498,14 +1570,14 @@
                         <div class="text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest border border-gray-200 bg-white px-3 py-1 rounded shadow-sm">Total Load: <span class="text-sm text-gray-900 font-black ml-1">${t.toLocaleString()}</span></div>
                     </div>
                     
-                    <div class="flex flex-col lg:flex-row flex-1 p-5 gap-6 items-stretch">
+                    <div class="flex flex-col xl:flex-row flex-1 p-5 gap-6 items-stretch">
                         <!-- Left: Stacked Bar + Line Chart -->
                         <div class="flex-[3] relative min-h-[300px] w-full cursor-pointer hover:opacity-90 transition" title="Klik pada batang manapun untuk melihat List Assy">
                             <canvas id="chartLine_${chartId}"></canvas>
                         </div>
                         
                         <!-- Divider -->
-                        <div class="hidden lg:block w-px bg-gray-100 shrink-0 self-stretch my-2"></div>
+                        <div class="hidden xl:block w-px bg-gray-100 shrink-0 self-stretch my-2"></div>
                         
                         <!-- Right: Big Pie Chart + Legend Side by Side -->
                         <div class="flex-[1.5] min-w-[320px] flex items-center justify-center p-4 bg-gray-50/50 rounded-xl border border-gray-100 shadow-inner">
@@ -1674,7 +1746,7 @@
 
             let currentIndex = 0;
             let pctFinalVal = totalFooters.TOTAL.GRAND > 0 ? Math.round(((totalFooters.TOTAL.GRAND - totalFooters.DELAY.GRAND) / totalFooters.TOTAL.GRAND) * 100) : 0;
-            const matrixTbody = document.getElementById('matrix-tbody'); let matrixHtml = '';
+            let matrixHtml = '';
             
             sortedPeriods.forEach(periode => {
                 let sortedWPPs = Object.keys(matrixData[periode]).sort((a,b) => parseInt(a) - parseInt(b));
@@ -1715,11 +1787,10 @@
                     currentIndex++;
                 });
             });
-            matrixTbody.innerHTML = matrixHtml;
+            safeSetHTML('matrix-tbody', matrixHtml);
 
-            const matrixTfoot = document.getElementById('matrix-tfoot');
             let pctFinalAll = totalFooters.TOTAL.GRAND > 0 ? ((totalFooters.TOTAL.GRAND - totalFooters.DELAY.GRAND) / totalFooters.TOTAL.GRAND * 100).toFixed(4) : 0;
-            matrixTfoot.innerHTML = `
+            let tfootHtml = `
                 <tr class="footer-row text-gray-800 border-t-[3px] border-gray-600">
                     <td colspan="3" class="text-right py-1">TOTAL LOADING</td>
                     <td class="text-right">${totalFooters.TOTAL.ADD.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.CAT.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.REG.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.SMC.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.SMV.toLocaleString()}</td>
@@ -1742,6 +1813,7 @@
                     <td class="bg-white border-none"></td><td class="bg-white border-none"></td>
                 </tr>
             `;
+            safeSetHTML('matrix-tfoot', tfootHtml);
         }
 
         // ==========================================
@@ -1811,9 +1883,6 @@
         }
 
         function renderControlPeriodeTabs() {
-            const container = document.getElementById('control-periode-tabs');
-            if(!container) return;
-            
             let periodes = new Set();
             globalMasterData.forEach(m => {
                 let p = String(m['PERIODE'] || '').trim();
@@ -1826,8 +1895,7 @@
             sortedPeriodes.forEach(p => {
                 html += `<button onclick="setActivePeriodeTab('${p}')" class="px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border shadow-sm ${activePeriodeTab === p ? 'bg-brand-500 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}">${p}</button>`;
             });
-            
-            container.innerHTML = html;
+            safeSetHTML('control-periode-tabs', html);
         }
 
         function setActivePeriodeTab(p) {
@@ -1838,16 +1906,12 @@
 
         function setupControlHeaders() {
             renderControlPeriodeTabs();
-            
-            const thead = document.getElementById('control-thead');
-            
             let displayHeaders = targetColumnsDB.filter(col => {
                 return masterHeaders.includes(col) || col === 'STATUS';
             });
             if (displayHeaders.length < 3) displayHeaders = targetColumnsDB; 
 
             let headerHtml = `<tr>`;
-            
             displayHeaders.forEach((col, colIdx) => {
                 headerHtml += `<th class="px-2 py-1.5 border-r border-gray-200 bg-gray-50 font-bold text-[9px] tracking-wider uppercase text-left align-top">
                                 <div class="flex flex-col gap-1 h-full filter-dropdown-container relative">
@@ -1889,34 +1953,26 @@
                 headerHtml += `</div></th>`;
             });
             headerHtml += `</tr>`;
-            thead.innerHTML = headerHtml;
+            safeSetHTML('control-thead', headerHtml);
 
-            // Pastikan filter reset ke default (Show All) saat diload pertama kali
             controlFilters = {};
             document.querySelectorAll('.filter-checkbox').forEach(cb => cb.addEventListener('change', (e) => updateCheckboxFilters(e.target.getAttribute('data-col-idx'))));
             document.querySelectorAll('.filter-input').forEach(input => input.addEventListener('input', (e) => { controlFilters[e.target.getAttribute('data-col')] = e.target.value.toLowerCase(); renderControlOutstanding(); }));
             
-            // JANGAN lakukan simulasi updateCheckboxFilters di sini karena akan membuat data tersembunyi
-            // Cukup panggil render
             renderControlOutstanding();
         }
 
         function renderControlOutstanding() {
-            const tbody = document.getElementById('control-tbody');
-            
             let displayHeaders = targetColumnsDB.filter(col => {
                 return masterHeaders.includes(col) || col === 'STATUS';
             });
             if (displayHeaders.length < 3) displayHeaders = targetColumnsDB; 
 
             let filteredData = globalMasterData.filter(row => {
-                // Filter Tab Periode
                 if (activePeriodeTab !== 'ALL') {
                     let rPer = String(row['PERIODE'] || '').trim();
                     if (rPer !== activePeriodeTab) return false;
                 }
-
-                // Filter Kolom Mutlak
                 return displayHeaders.every(col => {
                     let filterVal = controlFilters[col];
                     if (filterVal === undefined || filterVal === '') return true; 
@@ -1940,7 +1996,6 @@
                 });
             });
 
-            // Auto-sort berdasarkan STWC (Terlama ke Terbaru)
             filteredData.sort((a, b) => {
                 let tA = parseIndoDate(a['STWC']);
                 let tB = parseIndoDate(b['STWC']);
@@ -1951,8 +2006,6 @@
 
             let displayLimit = 300; let htmlString = "";
             filteredData.slice(0, displayLimit).forEach((row, idx) => {
-                let rowColor = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
-                
                 let bgClass = ''; let badge = '';
                 if(row._status === 'CLOSED') { bgClass = 'bg-emerald-50'; badge = `<span class="bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">CLOSED PP</span>`; }
                 else if(row._status === 'CND 3') { bgClass = 'bg-red-50'; badge = `<span class="bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded animate-pulse shadow-sm">CND 3</span>`; }
@@ -1971,7 +2024,7 @@
                 htmlString += `</tr>`;
             });
 
-            tbody.innerHTML = htmlString;
+            safeSetHTML('control-tbody', htmlString);
             safeSetText('control-counter', filteredData.length > displayLimit ? `Preview ${displayLimit}/${filteredData.length} Baris` : `Total ${filteredData.length} Baris`);
         }
 
@@ -2007,8 +2060,7 @@
         }
 
         function renderShMaterials() {
-            const container = document.getElementById('sh-cards-container');
-            if(globalShMaterials.length === 0) { container.innerHTML = `<div class="text-gray-400 text-center col-span-full mt-4">Belum ada data SH Material.</div>`; return; }
+            if(globalShMaterials.length === 0) { safeSetHTML('sh-cards-container', `<div class="text-gray-400 text-center col-span-full mt-4">Belum ada data SH Material.</div>`); return; }
             let html = '';
             globalShMaterials.forEach(sh => {
                 let isDatang = sh.tanggalKedatangan !== null;
@@ -2030,7 +2082,7 @@
                     </div>
                 `;
             });
-            container.innerHTML = html;
+            safeSetHTML('sh-cards-container', html);
             lucide.createIcons();
         }
 

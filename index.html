@@ -254,7 +254,7 @@
                     </div>
 
                     <!-- Right: Daily Data Trend (Health) -->
-                    <div class="bento-box p-5 bg-white flex flex-col h-[320px] lg:col-span-2 border-t-4 border-t-blue-400">
+                    <div class="bento-box p-5 bg-white flex flex-col h-[320px] lg:col-span-2 border-t-4 border-t-blue-400 shadow-sm">
                         <div class="mb-3 shrink-0 flex justify-between items-start">
                             <div>
                                 <h2 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="trending-up" class="w-4 h-4 text-blue-500"></i> Tren Kesehatan WIP (% On-Sched - <span id="daily-trend-title-cat" class="text-blue-600 font-black tracking-widest">ALL</span>)</h2>
@@ -462,23 +462,25 @@
         // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // MASUKKAN KONFIGURASI FIREBASE ANDA DI SINI
         // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-const firebaseConfig = {
-  apiKey: "AIzaSyDpxgbqlgCbYLKGiKmqw44DMRory_iMFBo",
-  authDomain: "e-wip-7ea42.firebaseapp.com",
-  databaseURL: "https://e-wip-7ea42-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "e-wip-7ea42",
-  storageBucket: "e-wip-7ea42.firebasestorage.app",
-  messagingSenderId: "202301603639",
-  appId: "1:202301603639:web:24c0ee15102abe3080a4b2"
-};
+        const firebaseConfig = {
+            apiKey: "MASUKKAN_API_KEY_ANDA_DI_SINI",
+            authDomain: "MASUKKAN_AUTH_DOMAIN_DI_SINI",
+            projectId: "MASUKKAN_PROJECT_ID_DI_SINI",
+            storageBucket: "MASUKKAN_STORAGE_BUCKET_DI_SINI",
+            messagingSenderId: "MASUKKAN_SENDER_ID_DI_SINI",
+            appId: "MASUKKAN_APP_ID_DI_SINI"
+        };
 
-        // Inisialisasi Firebase HANYA jika config sudah diisi (menghindari error saat belum diisi)
         let isFirebaseActive = false;
         let db = null;
         
         if(firebaseConfig.apiKey !== "MASUKKAN_API_KEY_ANDA_DI_SINI") {
             firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
+            
+            // Mengatasi error blokir firewall jaringan lokal file:///
+            db.settings({ experimentalForceLongPolling: true });
+            
             isFirebaseActive = true;
         }
 
@@ -489,21 +491,46 @@ const firebaseConfig = {
             }
             try { 
                 const serializedData = JSON.stringify(data); 
-                await db.collection("wip_dashboard").doc(key).set({ payload: serializedData }); 
+                
+                // Mencegah Firebase Crash karena limit 1MB per dokumen.
+                // 800000 characters = ~800KB.
+                const chunkSize = 800000; 
+                const chunksCount = Math.ceil(serializedData.length / chunkSize);
+
+                await db.collection("wip_dashboard").doc(key + "_meta").set({ chunks: chunksCount });
+
+                let promises = [];
+                for (let i = 0; i < chunksCount; i++) {
+                    let chunkStr = serializedData.substring(i * chunkSize, (i + 1) * chunkSize);
+                    promises.push(db.collection("wip_dashboard").doc(key + "_" + i).set({ payload: chunkStr }));
+                }
+                await Promise.all(promises); 
+                
             } catch(e) { 
                 console.error("Firebase Save Error:", e); 
-                showToast("Gagal menyimpan ke server cloud!", "error"); 
+                showToast("Gagal menyimpan ke server cloud! " + e.message, "error"); 
+                throw e; // Lemparkan error agar animasi terhenti dan tidak menampilkan tulisan Sukses
             }
         }
 
         async function loadDB(key) {
             if (!isFirebaseActive) return null;
             try { 
-                const docSnap = await db.collection("wip_dashboard").doc(key).get();
-                if (docSnap.exists) {
-                    return JSON.parse(docSnap.data().payload);
+                const metaSnap = await db.collection("wip_dashboard").doc(key + "_meta").get();
+                if (!metaSnap.exists) {
+                    // Cek fallback jika masih format database lama (non-chunk)
+                    const oldSnap = await db.collection("wip_dashboard").doc(key).get();
+                    if (oldSnap.exists) return JSON.parse(oldSnap.data().payload);
+                    return null;
                 }
-                return null;
+
+                const chunksCount = metaSnap.data().chunks;
+                let fullString = "";
+                for (let i = 0; i < chunksCount; i++) {
+                    const chunkSnap = await db.collection("wip_dashboard").doc(key + "_" + i).get();
+                    if (chunkSnap.exists) fullString += chunkSnap.data().payload;
+                }
+                return JSON.parse(fullString);
             } catch(e) { 
                 console.error("Firebase Load Error:", e); 
                 return null; 
@@ -816,22 +843,27 @@ const firebaseConfig = {
                             if (sheetsProcessed >= sheetsToProcess) {
                                 masterHeaders = sanitizeHeaders(Array.from(globalHeadersMap));
                                 (async () => {
-                                    await saveDB('master_data', globalMasterData);
-                                    await saveDB('master_headers', masterHeaders);
-                                    
-                                    try { setupControlHeaders(); } catch(e){}
-                                    updateInputStats(); updateGlobalThresholdUI();
-                                    
-                                    document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
-                                    document.getElementById('global-threshold-bar').classList.remove('hidden');
-                                    document.getElementById('btn-reset').classList.remove('hidden');
-                                    
-                                    overlay.classList.add('hidden');
-                                    showToast(`Master Update dari ${sheetsToProcess} Sheet: ${newAssyCount} Baru, ${updatedAssyCount} Diperbarui.`, 'success');
-                                    safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
-                                    
-                                    if(globalWipData.length > 0) recalculateValidation();
-                                    else switchTab('overview');
+                                    try {
+                                        await saveDB('master_data', globalMasterData);
+                                        await saveDB('master_headers', masterHeaders);
+                                        
+                                        try { setupControlHeaders(); } catch(e){}
+                                        updateInputStats(); updateGlobalThresholdUI();
+                                        
+                                        document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
+                                        document.getElementById('global-threshold-bar').classList.remove('hidden');
+                                        document.getElementById('btn-reset').classList.remove('hidden');
+                                        
+                                        overlay.classList.add('hidden');
+                                        showToast(`Master Update dari ${sheetsToProcess} Sheet: ${newAssyCount} Baru, ${updatedAssyCount} Diperbarui.`, 'success');
+                                        safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
+                                        
+                                        if(globalWipData.length > 0) recalculateValidation();
+                                        else switchTab('overview');
+                                    } catch (cloudErr) {
+                                        overlay.classList.add('hidden');
+                                        // Error sudah ditampilkan oleh saveDB
+                                    }
                                 })();
                                 return;
                             }
@@ -986,7 +1018,7 @@ const firebaseConfig = {
                             setLoaderState('Cross-Validation...', 'Mencocokkan Master vs WIP', 50, '');
                             let closedCount = 0; let cnd3Count = 0; let cnd2Count = 0; let openCount = 0;
                             
-                            // VALIDASI MUTLAK
+                            // VALIDASI MUTLAK WAKTU H+1 & H+2
                             globalMasterData.forEach(masterRow => {
                                 let uid = masterRow._uid;
                                 let stwcTime = parseIndoDate(masterRow['STWC']);
@@ -1023,18 +1055,22 @@ const firebaseConfig = {
                             else dailyHistory.push(newHistoryEntry);
 
                             (async () => {
-                                await saveDB('master_data', globalMasterData); 
-                                await saveDB('wip_data', globalWipData); 
-                                await saveDB('daily_history', dailyHistory);
-                                await saveDB('last_wip_date', todayStr);
-                                
-                                updateInputStats(); updateGlobalThresholdUI(); try { setupControlHeaders(); } catch(e){}
-                                document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
-                                document.getElementById('global-threshold-bar').classList.remove('hidden');
-                                document.getElementById('btn-reset').classList.remove('hidden');
-                                overlay.classList.add('hidden');
-                                showToast(`Validasi Tersimpan di Cloud: ${closedCount} Closed, ${cnd2Count} Warning, ${cnd3Count} Overdue.`, 'success');
-                                switchTab('overview');
+                                try {
+                                    await saveDB('master_data', globalMasterData); 
+                                    await saveDB('wip_data', globalWipData); 
+                                    await saveDB('daily_history', dailyHistory);
+                                    await saveDB('last_wip_date', todayStr);
+                                    
+                                    updateInputStats(); updateGlobalThresholdUI(); try { setupControlHeaders(); } catch(e){}
+                                    document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
+                                    document.getElementById('global-threshold-bar').classList.remove('hidden');
+                                    document.getElementById('btn-reset').classList.remove('hidden');
+                                    overlay.classList.add('hidden');
+                                    showToast(`Validasi Selesai: ${closedCount} Closed, ${cnd2Count} Warning, ${cnd3Count} Overdue.`, 'success');
+                                    switchTab('overview');
+                                } catch (cloudErr) {
+                                    overlay.classList.add('hidden');
+                                }
                             })();
 
                         } else { overlay.classList.add('hidden'); showToast("Format File WIP Salah.", 'error'); }
@@ -1118,24 +1154,24 @@ const firebaseConfig = {
 
             let totalAct = openCount + cnd3Count + cnd2Count;
             let pctOnSched = totalAct > 0 ? (openCount / totalAct) * 100 : 0;
-            let newHistoryEntry = { dateKey: todayStr, label: new Date().toLocaleDateString('id-ID', {day:'numeric', month:'short'}), cnd3: cnd3Count + cnd2Count, open: openCount, closed: globalMasterData.filter(m=>m._status==='CLOSED').length, pct: pctOnSched, catPct: {} };
-            
             let existingHistoryIdx = dailyHistory.findIndex(h => h.dateKey === todayStr);
             if(existingHistoryIdx !== -1) {
                 dailyHistory[existingHistoryIdx].cnd3 = cnd3Count + cnd2Count;
                 dailyHistory[existingHistoryIdx].open = openCount;
                 dailyHistory[existingHistoryIdx].closed = globalMasterData.filter(m=>m._status==='CLOSED').length;
                 dailyHistory[existingHistoryIdx].pct = pctOnSched;
-            } else {
-                dailyHistory.push(newHistoryEntry);
             }
 
-            await saveDB('master_data', globalMasterData);
-            await saveDB('daily_history', dailyHistory);
+            try {
+                await saveDB('master_data', globalMasterData);
+                await saveDB('daily_history', dailyHistory);
 
-            showToast('Rekalkulasi Server Cloud Selesai.', 'success');
-            refreshDashboards();
-            try { renderControlOutstanding(); } catch(e){}
+                showToast('Rekalkulasi Server Cloud Selesai.', 'success');
+                refreshDashboards();
+                try { renderControlOutstanding(); } catch(e){}
+            } catch(e) {
+                // error handled in saveDB
+            }
         }
 
         // Context Switcher logic
@@ -1215,6 +1251,7 @@ const firebaseConfig = {
             let delayIndex = globalUniquePeriodeWPP.indexOf(globalDelayPWKey);
             if(delayIndex === -1) delayIndex = 0;
 
+            // 1. FILTER MASTER DATA BERDASARKAN CONTEXT & CUTOFF
             let activeMasterData = globalMasterData.filter(m => {
                 let rPer = String(m['PERIODE'] || '-').trim();
                 let rWp = getWPP(String(m['WP'] || '-').trim());
@@ -1232,6 +1269,7 @@ const firebaseConfig = {
                 return true;
             });
 
+            // Master Analytics
             let tMaster = activeMasterData.length;
             let tCnd3 = activeMasterData.filter(m => m._status === 'CND 3').length;
             let tCnd2 = activeMasterData.filter(m => m._status === 'CND 2').length;
@@ -1248,6 +1286,7 @@ const firebaseConfig = {
             let closedToday = activeMasterData.filter(m => m._status === 'CLOSED' && m._closedDate === todayStr);
             let overdueList = activeMasterData.filter(m => m._status === 'CND 3' || m._status === 'CND 2');
             
+            // Sub-filter WP pada Overdue List
             if(activeOverdueWP !== 'ALL') {
                 overdueList = overdueList.filter(m => {
                     let w = String(m['WP'] || '').toUpperCase();
@@ -1257,6 +1296,7 @@ const firebaseConfig = {
                 });
             }
 
+            // Sub-filter WP pada Closed List
             if(activeClosedWP !== 'ALL') {
                 closedToday = closedToday.filter(m => {
                     let w = String(m['WP'] || '').toUpperCase();
@@ -1269,6 +1309,7 @@ const firebaseConfig = {
             closedToday.sort((a, b) => parseIndoDate(a['STWC']) - parseIndoDate(b['STWC']));
             overdueList.sort((a, b) => parseIndoDate(a['STWC']) - parseIndoDate(b['STWC']));
 
+            // Render Overdue WP Filters
             const ovWpFilterContainer = document.getElementById('overdue-wp-filters');
             if(ovWpFilterContainer) {
                 let wpFiltersHtml = '';
@@ -1280,6 +1321,7 @@ const firebaseConfig = {
                 ovWpFilterContainer.innerHTML = wpFiltersHtml;
             }
 
+            // Render Closed WP Filters
             const clWpFilterContainer = document.getElementById('closed-wp-filters');
             if(clWpFilterContainer) {
                 let clFiltersHtml = '';
@@ -1402,7 +1444,8 @@ const firebaseConfig = {
             let intercept = n > 0 ? (sumY - slope * sumX) / n : parseFloat(pctData[0] || 0);
             let trendlineData = []; for (let i = 0; i < n; i++) trendlineData.push((slope * i + intercept).toFixed(2));
 
-            safeSetText('daily-trend-title-cat', activeOverviewCat);
+            const titleCatEl = document.getElementById('daily-trend-title-cat');
+            if (titleCatEl) titleCatEl.innerText = activeOverviewCat;
 
             createOrUpdateChart('chartDailyTrend', 'line', {
                 labels: dailyLabels,
@@ -1532,18 +1575,94 @@ const firebaseConfig = {
                 stackedData.grand.sched.slice(cutoffIndex)
             );
 
+            // Kategori Charts (Visual Baru Bersebelahan, Compact Tinggi, Bar + Trendline)
             if (activeOverviewCat === 'ALL') {
-                CATEGORIES.forEach(cat => {
-                    let catNameLow = cat.toLowerCase();
-                    renderBigChart(
-                        cat, 
-                        `Tren Loading Kategori: ${cat}`, 
-                        catStats[cat], 
-                        globalUniquePeriodeWPP.slice(cutoffIndex).map(k => catSums[cat][k]), 
-                        stackedData[catNameLow].sh.slice(cutoffIndex), 
-                        stackedData[catNameLow].delay.slice(cutoffIndex), 
-                        stackedData[catNameLow].sched.slice(cutoffIndex)
-                    );
+                CATEGORIES.forEach((cat) => {
+                    let s = catStats[cat]; let t = s.load;
+                    let pctDelay = t > 0 ? Math.round((s.delay/t)*100) : 0;
+                    let pctSched = t > 0 ? Math.round((s.onsched/t)*100) : 0;
+                    let pctSh = t > 0 ? Math.round((s.sh/t)*100) : 0;
+                    
+                    document.getElementById(`cat-chart-${cat}`).innerHTML = `
+                        <div class="flex justify-between items-start mb-2 shrink-0 border-b pb-1 border-gray-100">
+                            <span class="text-[12px] font-black text-gray-800 tracking-tight">${cat} TREND</span>
+                            <div class="text-right text-[9px] font-bold text-gray-500 uppercase tracking-wider">Load: <span class="text-sm text-gray-800 ml-1">${t.toLocaleString()}</span></div>
+                        </div>
+                        
+                        <div class="flex w-full flex-1 gap-4 items-center mt-1">
+                            <!-- Line/Stacked Bar Chart Area -->
+                            <div class="flex-[1.2] relative w-full h-[100px] min-w-0 pr-4 border-r border-gray-100 cursor-pointer hover:opacity-80 transition" title="Klik diagram batang untuk melihat rincian Assy">
+                                <canvas id="chartLine${cat}"></canvas>
+                            </div>
+                            
+                            <!-- Pie Chart Area Side by Side -->
+                            <div class="flex-[1] flex flex-row justify-center items-center gap-3 relative shrink-0 h-[100px]">
+                                <div class="w-[90px] h-[90px] relative shrink-0"><canvas id="chartPie${cat}"></canvas></div>
+                                <div class="w-full flex flex-col gap-1.5 text-[8px] font-bold">
+                                    <div class="flex justify-between items-center text-blue-700 bg-blue-50 px-2 py-1 rounded shadow-sm border border-blue-100">
+                                        <div class="flex flex-col leading-tight"><span>Sched</span><span class="text-[10px] text-gray-800">${s.onsched.toLocaleString()}</span></div>
+                                        <span class="text-[8px] bg-white px-1 py-0.5 rounded text-blue-600">${pctSched}%</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-red-700 bg-red-50 px-2 py-1 rounded shadow-sm border border-red-100">
+                                        <div class="flex flex-col leading-tight"><span>Delay</span><span class="text-[10px] text-gray-800">${s.delay.toLocaleString()}</span></div>
+                                        <span class="text-[8px] bg-white px-1 py-0.5 rounded text-red-600">${pctDelay}%</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-amber-700 bg-amber-50 px-2 py-1 rounded shadow-sm border border-amber-100">
+                                        <div class="flex flex-col leading-tight"><span>SH</span><span class="text-[10px] text-gray-800">${s.sh.toLocaleString()}</span></div>
+                                        <span class="text-[8px] bg-white px-1 py-0.5 rounded text-amber-600">${pctSh}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    let activeCatDataArray = globalUniquePeriodeWPP.slice(cutoffIndex).map(k => catSums[cat][k]);
+                    
+                    createOrUpdateChart(`chartLine${cat}`, 'bar', { 
+                        labels: activeLabels, 
+                        datasets: [ 
+                            { type: 'line', data: activeCatDataArray, borderColor: '#475569', borderWidth: 2, fill: false, tension: 0.4, pointBackgroundColor: '#ffffff', pointBorderColor: '#475569', pointRadius: 3 }, 
+                            { type: 'bar', label: 'SH', data: stackedData[cat.toLowerCase()].sh.slice(cutoffIndex), backgroundColor: '#fbbf24', borderRadius: {topLeft:3, topRight:3, bottomLeft:0, bottomRight:0} },
+                            { type: 'bar', label: 'Delay', data: stackedData[cat.toLowerCase()].delay.slice(cutoffIndex), backgroundColor: '#ef4444', borderRadius: {topLeft:3, topRight:3, bottomLeft:0, bottomRight:0} },
+                            { type: 'bar', label: 'On Sched', data: stackedData[cat.toLowerCase()].sched.slice(cutoffIndex), backgroundColor: '#3b82f6', borderRadius: {topLeft:3, topRight:3, bottomLeft:0, bottomRight:0} }
+                        ] 
+                    }, { 
+                        responsive: true, maintainAspectRatio: false, 
+                        plugins: { 
+                            datalabels: { 
+                                display: function(context) { return context.dataset.type === 'bar' && context.dataset.data[context.dataIndex] > 0; },
+                                color: '#fff', font: { weight: 'bold', size: 7 }, formatter: Math.round
+                            }, 
+                            legend: {display: false} 
+                        }, 
+                        scales: { x: { stacked: true, display: false }, y: { stacked: true, display: false } },
+                        onClick: (e, elements, chart) => {
+                            if (!elements.length) return;
+                            const dataIndex = elements[0].index;
+                            const pwKey = globalUniquePeriodeWPP.slice(cutoffIndex)[dataIndex];
+                            openDrilldownModal(pwKey, cat);
+                        }
+                    });
+
+                    createOrUpdateChart(`chartPie${cat}`, 'doughnut', {
+                        labels: ['Delay', 'On Sched', 'SH'],
+                        datasets: [{ data: [s.delay, s.onsched, s.sh], backgroundColor: ['#ef4444', '#3b82f6', '#f59e0b'], borderWidth: 1, borderColor: '#fff', hoverOffset: 2 }]
+                    }, { 
+                        responsive: true, maintainAspectRatio: false, 
+                        plugins: { 
+                            legend: {display: false}, 
+                            tooltip: { enabled: true },
+                            datalabels: {
+                                display: function(context) { return context.dataset.data[context.dataIndex] > 0; },
+                                formatter: (value, ctx) => {
+                                    let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                    return (value*100 / sum).toFixed(0)+"%";
+                                },
+                                color: '#fff', font: { weight: 'bold', size: 9 }
+                            }
+                        }, 
+                        cutout: '50%' 
+                    });
                 });
             }
         }

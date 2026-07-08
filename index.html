@@ -1,0 +1,1982 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Monitoring WIP & Master Validation (Cloud Version)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- SheetJS (Excel Parser) -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Chart.js & DataLabels Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+    <!-- HTML2Canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- FIREBASE SDK (Compat Version for Easy Integration) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'Segoe UI', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#f0fdfa', 100: '#ccfbf1', 500: '#14b8a6', 600: '#0d9488', 900: '#134e4a' },
+                        bento: { bg: '#f3f4f6', border: '#e5e7eb' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { background-color: #f4f5f7; color: #1e293b; }
+        
+        .bento-box { background-color: #ffffff; border-radius: 0.75rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .table-header { position: sticky; top: 0; z-index: 10; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        ::-webkit-scrollbar { height: 6px; width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        #loading-overlay { backdrop-filter: blur(4px); transition: opacity 0.3s; }
+        .progress-bar-fill { transition: width 0.1s linear; }
+        
+        /* EXCEL TABLE STYLE */
+        .excel-table { border-collapse: separate; border-spacing: 0; width: 100%; }
+        .excel-table th, .excel-table td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 0.3rem 0.5rem; font-size: 11px; }
+        .excel-table th { background-color: #f1f5f9; text-align: center; font-weight: 700; border-top: 1px solid #e2e8f0; padding: 0.4rem 0.5rem; font-size: 11.5px;}
+        .excel-table td:first-child, .excel-table th:first-child { border-left: 1px solid #e2e8f0; }
+        .excel-table .row-group-start td { border-top: 1.5px solid #94a3b8; }
+        .excel-table .footer-row td { background-color: #f8fafc; font-weight: bold; border-top: 2px solid #475569; }
+        .excel-table .sub-footer td { border-top: 1px solid #e2e8f0; }
+        
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { padding: 12px 20px; border-radius: 8px; color: white; font-weight: 600; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transform: translateY(20px); transition: all 0.3s ease; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background-color: #10b981; }
+        .toast.error { background-color: #ef4444; }
+        .toast.warning { background-color: #f59e0b; }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden font-sans text-sm relative">
+
+    <div id="toast-container"></div>
+
+    <!-- Loading Screen Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900/80 z-50 flex flex-col items-center justify-center">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+            <div class="animate-bounce mb-4"><i data-lucide="cloud" class="w-12 h-12 text-brand-500 mx-auto"></i></div>
+            <h3 class="text-lg font-bold text-gray-800 mb-1" id="loading-title">Menghubungkan ke Cloud...</h3>
+            <p class="text-xs text-gray-500 mb-6" id="loading-desc">Membaca data dari server Firebase.</p>
+            <div class="w-full bg-gray-100 rounded-full h-3 mb-2 overflow-hidden border border-gray-200">
+                <div id="loading-bar" class="bg-brand-500 h-3 rounded-full progress-bar-fill w-0"></div>
+            </div>
+            <div class="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <span id="loading-pct">0%</span><span id="loading-rows">Menyinkronkan...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drilldown Modal (List Assy Chart Click) -->
+    <div id="drilldown-modal" class="fixed inset-0 bg-gray-900/80 z-[9999] hidden flex flex-col items-center justify-center p-4 lg:p-10 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-200">
+            <div class="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="bg-brand-500 text-white p-2 rounded-lg"><i data-lucide="list" class="w-5 h-5"></i></div>
+                    <div>
+                        <h3 id="drilldown-title" class="font-bold text-lg text-gray-800 tracking-tight leading-none">List Assy WPP</h3>
+                        <span id="drilldown-subtitle" class="text-xs text-brand-600 font-bold bg-brand-50 px-2 py-0.5 rounded mt-1 inline-block">Detailed View</span>
+                    </div>
+                </div>
+                <button onclick="closeDrilldown()" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="flex-1 overflow-auto p-0 bg-white">
+                <table class="excel-table w-full whitespace-nowrap">
+                    <thead class="sticky top-0 shadow-sm z-10">
+                        <tr><th class="w-20">STATUS</th><th class="text-left w-48">ASSY NO</th><th class="w-24 text-left">WP</th><th class="w-24 text-center">STWC</th><th class="w-20 text-center">QTY</th><th class="w-20 text-center">TOTAL CCT</th><th class="text-left">CUSTOMER</th></tr>
+                    </thead>
+                    <tbody id="drilldown-tbody" class="divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navbar Restructured -->
+    <nav class="bg-white border-b border-bento-border px-4 py-2 flex items-center justify-between z-20 shrink-0 shadow-sm">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 mr-2">
+                <div class="bg-brand-500 text-white p-1.5 rounded-lg shadow-sm"><i data-lucide="cloud" class="w-4 h-4"></i></div>
+                <div>
+                    <h1 class="font-bold text-gray-800 text-sm leading-none tracking-tight">Executive WIP</h1>
+                    <span class="text-[9px] text-brand-600 font-bold uppercase tracking-wider">Cloud Synchronized</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg hidden" id="nav-center-menus">
+            <button id="btn-tab-overview" onclick="switchTab('overview')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-500 hover:text-gray-800 border border-transparent">Overview</button>
+            <button onclick="recalculateValidation()" class="px-2 py-1.5 bg-brand-100 text-brand-700 hover:bg-brand-200 rounded text-[10px] font-bold shadow-sm transition flex items-center gap-1" title="Hitung ulang status Open/Closed/CND3 berdasarkan tanggal aktual"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Recalculate Validasi</button>
+            <div class="w-px h-5 bg-gray-300 mx-1"></div>
+            <button id="btn-tab-report" onclick="switchTab('report')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800">Resume Analisis</button>
+            <button id="btn-tab-control" onclick="switchTab('control')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800 flex items-center gap-1"><i data-lucide="database" class="w-3.5 h-3.5 text-brand-500"></i> Database Bersih</button>
+            <button id="btn-tab-sh" onclick="switchTab('sh')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800">SH Material</button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button id="btn-tab-master" onclick="switchTab('master')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1.5">
+                <i data-lucide="library" class="w-3.5 h-3.5"></i> Master Data (MPP)
+            </button>
+            <button id="btn-tab-input" onclick="switchTab('input')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 flex items-center gap-1.5">
+                <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i> WIP Input (Harian)
+            </button>
+            <button onclick="resetData()" id="btn-reset" class="hidden px-2 py-1.5 rounded text-[10px] font-semibold text-red-600 hover:bg-red-50 border border-transparent transition flex items-center gap-1">
+                <i data-lucide="power" class="w-3.5 h-3.5"></i> Factory Reset
+            </button>
+        </div>
+    </nav>
+
+    <!-- Set Outstanding (Global Control for ALL tabs) -->
+    <div class="bg-amber-50 border-b border-amber-200 px-4 py-2 flex flex-col md:flex-row justify-between items-center shrink-0 shadow-sm hidden gap-2" id="global-threshold-bar">
+        <div class="flex items-center gap-2">
+            <i data-lucide="target" class="w-4 h-4 text-amber-600"></i>
+            <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Global Threshold Control:</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-1.5 bg-white px-2 py-0.5 border border-amber-300 rounded shadow-sm">
+                <span class="text-[9px] font-bold text-gray-500 uppercase">1. Cut-Off (Abaikan WPP Lama):</span>
+                <select id="cutoff-wpp-select" onchange="updateCutoffThreshold(this.value)" class="text-[10px] font-bold outline-none text-gray-800 bg-transparent"></select>
+            </div>
+            <div class="flex items-center gap-1.5 bg-white px-2 py-0.5 border border-amber-300 rounded shadow-sm">
+                <span class="text-[9px] font-bold text-gray-500 uppercase">2. Batas Outstanding (Delay):</span>
+                <select id="delay-wpp-select" onchange="updateDelayThreshold(this.value)" class="text-[10px] font-bold outline-none text-red-600 bg-transparent"></select>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-1 overflow-auto p-3 flex flex-col gap-4 bg-gray-100/50" id="main-scroll-area">
+        
+        <!-- ================= OVERVIEW VIEW (DASHBOARD) ================= -->
+        <section id="view-overview" class="hidden w-full flex flex-col gap-4 pb-10">
+            <!-- OVERVIEW EXPORT WRAPPER -->
+            <div id="view-overview-export-wrapper" class="w-full flex flex-col gap-4 bg-gray-100/50 p-2 rounded-xl">
+                
+                <!-- Category Overview Context Filters -->
+                <div class="flex flex-col sm:flex-row justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-200 shrink-0 gap-3" data-html2canvas-ignore id="overview-export-buttons-hide">
+                    <div class="flex gap-3 items-center w-full overflow-x-auto scrollbar-hide">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1"><i data-lucide="filter" class="w-3 h-3"></i> TAMPILAN KATEGORI:</span>
+                        <div class="flex gap-1.5 bg-gray-100 p-1 rounded-lg" id="overview-cat-buttons">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                    <button onclick="downloadOverviewImage()" class="shrink-0 flex items-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-md text-[10px] font-bold shadow transition"><i data-lucide="camera" class="w-3.5 h-3.5"></i> Export Dashboard</button>
+                </div>
+
+                <!-- MASTER DATA ANALYTICS ROW -->
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 shrink-0">
+                    <div class="bento-box p-4 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white relative overflow-hidden shadow-lg border-none">
+                        <i data-lucide="layers" class="w-20 h-20 absolute -right-4 -bottom-4 opacity-20"></i>
+                        <h3 class="text-[10px] font-bold uppercase tracking-widest text-indigo-100 mb-1">Total List Assy</h3>
+                        <div id="ov-master-total" class="text-3xl font-black">0</div>
+                        <p class="text-[9px] text-indigo-200 mt-1">Database Valid (Atas Cut-Off)</p>
+                    </div>
+                    <div class="bento-box p-4 border-l-[5px] border-l-brand-500 bg-brand-50/40">
+                        <div class="flex justify-between items-start mb-1">
+                            <h3 class="text-[10px] font-bold uppercase tracking-widest text-brand-700">On Schedule</h3>
+                            <i data-lucide="clock" class="w-4 h-4 text-brand-500 opacity-70"></i>
+                        </div>
+                        <div id="ov-master-onsched" class="text-3xl font-black text-gray-800 tracking-tight">0</div>
+                        <p class="text-[9px] text-gray-500 mt-1">Sesuai rentang STWC (Aman)</p>
+                    </div>
+                    <div class="bento-box p-4 border-l-[5px] border-l-amber-400 bg-amber-50/40">
+                        <div class="flex justify-between items-start mb-1">
+                            <h3 class="text-[10px] font-bold uppercase tracking-widest text-amber-700">Warning (CND 2)</h3>
+                            <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 opacity-70"></i>
+                        </div>
+                        <div id="ov-master-cnd2" class="text-3xl font-black text-gray-800 tracking-tight">0</div>
+                        <p class="text-[9px] text-gray-500 mt-1">STWC terlewat H+1 Hari</p>
+                    </div>
+                    <div class="bento-box p-4 border-l-[5px] border-l-red-500 bg-red-50/40">
+                        <div class="flex justify-between items-start mb-1">
+                            <h3 class="text-[10px] font-bold uppercase tracking-widest text-red-700">Overdue (CND 3)</h3>
+                            <i data-lucide="alert-octagon" class="w-4 h-4 text-red-500 opacity-70"></i>
+                        </div>
+                        <div id="ov-master-cnd3" class="text-3xl font-black text-gray-800 tracking-tight">0</div>
+                        <p class="text-[9px] text-gray-500 mt-1">STWC terlewat ≥ H+2 Hari</p>
+                    </div>
+                    <div class="bento-box p-4 border-l-[5px] border-l-emerald-500 bg-emerald-50/40">
+                        <div class="flex justify-between items-start mb-1">
+                            <h3 class="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Closed (Finish)</h3>
+                            <i data-lucide="check-circle" class="w-4 h-4 text-emerald-500 opacity-70"></i>
+                        </div>
+                        <div id="ov-master-closed" class="text-3xl font-black text-gray-800 tracking-tight">0</div>
+                        <p class="text-[9px] text-gray-500 mt-1">Tuntas / Hilang dari WIP</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 shrink-0">
+                    <!-- Left 1: Overdue List -->
+                    <div class="bento-box bg-white flex flex-col h-[320px] overflow-hidden">
+                        <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 shrink-0 bg-red-50/30">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-1.5"><i data-lucide="alert-octagon" class="w-4 h-4 text-red-600"></i><h2 class="font-bold text-gray-800 text-xs">Warning & Overdue</h2></div>
+                                <span id="ov-overdue-list-count" class="text-[10px] font-bold text-white bg-red-500 px-2 py-0.5 rounded-full">0</span>
+                            </div>
+                            <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide" id="overdue-wp-filters"></div>
+                        </div>
+                        <div id="overview-overdue-list" class="flex-1 overflow-auto flex flex-col gap-1.5 p-3"></div>
+                    </div>
+
+                    <!-- Left 2: Daily Closed Log -->
+                    <div class="bento-box bg-white flex flex-col h-[320px] overflow-hidden border-t-4 border-t-emerald-400">
+                        <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 shrink-0 bg-emerald-50/30">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-1.5"><i data-lucide="party-popper" class="w-4 h-4 text-emerald-600"></i><h2 class="font-bold text-gray-800 text-xs">Closed Hari Ini</h2></div>
+                                <span id="ov-closed-today-count" class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">0</span>
+                            </div>
+                            <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide" id="closed-wp-filters"></div>
+                        </div>
+                        <div id="overview-closed-list" class="flex-1 overflow-auto flex flex-col gap-1.5 p-3"></div>
+                    </div>
+
+                    <!-- Right: Daily Data Trend (Health) -->
+                    <div class="bento-box p-5 bg-white flex flex-col h-[320px] lg:col-span-2 border-t-4 border-t-blue-400">
+                        <div class="mb-3 shrink-0 flex justify-between items-start">
+                            <div>
+                                <h2 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="trending-up" class="w-4 h-4 text-blue-500"></i> Tren Kesehatan WIP (% On-Sched - <span id="daily-trend-title-cat" class="text-blue-600 font-black tracking-widest">ALL</span>)</h2>
+                                <p class="text-[10px] text-gray-500 mt-1">Kalkulasi % On Schedule berbanding Total Load Aktif berdasar riwayat.</p>
+                            </div>
+                            <div class="bg-gray-50 px-2 py-1 rounded border border-gray-100 text-[9px] font-bold text-gray-500">HISTORY</div>
+                        </div>
+                        <div class="flex-1 relative w-full"><canvas id="chartDailyTrend"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Loading Trends - BESAR & DITONJOLKAN -->
+                <div class="bento-box p-5 bg-white flex flex-col w-full mt-2 shadow-sm">
+                    <div class="flex justify-between items-center w-full mb-3 shrink-0 border-b border-gray-100 pb-3">
+                        <div>
+                            <h2 class="font-bold text-gray-800 text-lg flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5 text-brand-500"></i> Analisis Loading & Outstanding</h2>
+                            <p class="text-[11px] text-gray-500 mt-1">Area dengan latar belakang merah transparan menunjukkan batas Outstanding (Delay).</p>
+                        </div>
+                    </div>
+
+                    <!-- HIGHLIGHT KPI RAKSASA -->
+                    <div class="flex flex-wrap lg:flex-nowrap gap-4 mb-5 shrink-0">
+                        <div class="flex-1 flex flex-col bg-gray-50 border border-gray-200 px-5 py-3 rounded-xl shadow-sm">
+                            <span class="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Total Load Aktif</span>
+                            <span id="ov-kpi-load" class="text-3xl font-black text-gray-800">0</span>
+                        </div>
+                        <div class="flex-1 flex flex-col bg-blue-50 border border-blue-200 px-5 py-3 rounded-xl shadow-sm">
+                            <span class="text-[11px] text-blue-600 font-bold uppercase tracking-wider mb-1">On Schedule</span>
+                            <span id="ov-kpi-onsched" class="text-3xl font-black text-blue-700">0</span>
+                        </div>
+                        <div class="flex-1 flex flex-col bg-red-50 border border-red-200 px-5 py-3 rounded-xl shadow-sm">
+                            <span class="text-[11px] text-red-600 font-bold uppercase tracking-wider mb-1">Total Delay</span>
+                            <span id="ov-kpi-delay" class="text-3xl font-black text-red-700">0</span>
+                        </div>
+                        <div class="flex-1 flex flex-col bg-amber-50 border border-amber-200 px-5 py-3 rounded-xl shadow-sm">
+                            <span class="text-[11px] text-amber-600 font-bold uppercase tracking-wider mb-1">Shortage (SH)</span>
+                            <span id="ov-kpi-sh" class="text-3xl font-black text-amber-700">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DYNAMIC CHARTS CONTAINER -->
+                <div id="overview-charts-container" class="flex flex-col gap-5 shrink-0">
+                    <!-- JS Injected: Big Chart Sections -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= MASTER DATA INPUT (UPLOAD) VIEW ================= -->
+        <section id="view-master" class="hidden h-full flex flex-col items-center justify-center">
+            <div class="bento-box max-w-xl w-full p-8 text-center relative overflow-hidden shadow-xl">
+                <div class="absolute top-0 left-0 w-full h-1.5 bg-indigo-500"></div>
+                <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-indigo-100">
+                    <i data-lucide="library" class="text-indigo-600 w-8 h-8"></i>
+                </div>
+                <h2 class="text-2xl font-black text-gray-800 mb-2 tracking-tight">Database Master (MPP)</h2>
+                <p class="text-gray-500 text-xs mb-8 leading-relaxed px-4">Sistem mengekstrak <strong class="text-indigo-600">Seluruh Sheet</strong> secara otomatis.<br/>Sistem mengabaikan Line <strong>Proto/PT</strong> dan menstandarkan format STWC.</p>
+                
+                <div id="drop-zone-master" class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/50 bg-gray-50/50 rounded-2xl p-10 transition-all cursor-pointer group mb-6">
+                    <input type="file" id="file-input-master" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="bg-white w-14 h-14 rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform border border-gray-100">
+                        <i data-lucide="upload-cloud" class="text-gray-400 group-hover:text-indigo-500 w-6 h-6 transition-colors"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-gray-700 group-hover:text-indigo-700 transition">Upload File MPP All Line</h3>
+                    <p class="text-[10px] text-gray-400 mt-1">Seret & lepas file Excel di sini</p>
+                </div>
+                
+                <div class="flex items-center justify-between bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-[11px]">
+                    <div class="flex flex-col text-left">
+                        <span class="text-gray-500 font-medium">Total Master Terdaftar</span> 
+                        <strong id="info-master-count" class="text-indigo-800 text-lg font-black leading-none mt-1">0 <span class="text-xs font-bold">Assy</span></strong>
+                    </div>
+                    <button onclick="resetMasterData()" class="px-4 py-2 bg-white hover:bg-red-50 text-red-600 font-bold rounded-lg border border-red-100 shadow-sm flex items-center gap-1.5 transition">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Kosongkan
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= DATABASE INPUT (DAILY WIP) VIEW ================= -->
+        <section id="view-input" class="hidden h-full flex flex-col items-center justify-center">
+            <div class="bento-box max-w-xl w-full p-8 text-center relative overflow-hidden shadow-xl">
+                <div class="absolute top-0 left-0 w-full h-1.5 bg-brand-500"></div>
+                <div class="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-brand-100">
+                    <i data-lucide="database" class="text-brand-600 w-8 h-8"></i>
+                </div>
+                <h2 class="text-2xl font-black text-gray-800 mb-2 tracking-tight">Validasi WIP Harian</h2>
+                <p class="text-gray-500 text-xs mb-8 leading-relaxed px-4">Upload <strong>Report WIP</strong> terbaru untuk sinkronisasi harian.<br/>Assy yang hilang atau PP kosong/strip otomatis menjadi <strong class="text-brand-600">Closed</strong>.</p>
+                
+                <div id="drop-zone-wip" class="border-2 border-dashed border-brand-200 hover:border-brand-400 hover:bg-brand-50/50 bg-gray-50/50 rounded-2xl p-10 transition-all cursor-pointer group mb-6">
+                    <input type="file" id="file-input-wip" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="bg-white w-14 h-14 rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform border border-gray-100">
+                        <i data-lucide="upload-cloud" class="text-gray-400 group-hover:text-brand-500 w-6 h-6 transition-colors"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-gray-700 group-hover:text-brand-700 transition">Upload Report WIP</h3>
+                    <p class="text-[10px] text-gray-400 mt-1">Data hari ini akan menimpa (replace) jika diupload ulang</p>
+                </div>
+
+                <div class="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-200 text-[11px]">
+                    <div class="flex flex-col text-left">
+                        <span class="text-gray-500 font-medium">Validasi Terakhir</span> 
+                        <strong id="info-last-sync" class="text-gray-800 text-sm font-black mt-1">-</strong>
+                    </div>
+                    <button onclick="resetWipData()" class="px-4 py-2 bg-white hover:bg-red-50 text-red-600 font-bold rounded-lg border border-red-100 shadow-sm flex items-center gap-1.5 transition">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus WIP
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= DATABASE BERSIH VIEW (SOURCE: MASTER DATA) ================= -->
+        <section id="view-control" class="hidden h-full flex flex-col gap-2 pb-4 items-center overflow-hidden">
+            <div class="bento-box w-full max-w-[98%] flex flex-col overflow-hidden h-full mt-2 shadow-sm">
+                <div class="px-4 py-3 bg-white border-b border-gray-200 flex flex-col shrink-0 gap-3">
+                    <div class="flex justify-between items-center w-full">
+                        <div class="text-[14px] font-black text-gray-800 flex items-center gap-2 tracking-tight">
+                            <i data-lucide="database" class="w-5 h-5 text-brand-500"></i> Database Bersih Tervalidasi
+                        </div>
+                        <div id="control-counter" class="text-[10px] font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-100 shadow-sm"></div>
+                    </div>
+                    
+                    <!-- Tabs Periode Database Bersih -->
+                    <div id="control-periode-tabs" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide"></div>
+                </div>
+                
+                <div class="flex-1 overflow-auto bg-gray-50/30 p-2">
+                    <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-auto min-h-[400px] relative" id="control-table-container">
+                        <table class="min-w-full text-[10px] whitespace-nowrap border-collapse">
+                            <thead id="control-thead" class="table-header text-gray-600 bg-gray-50 sticky top-0 shadow-sm z-20"></thead>
+                            <tbody id="control-tbody" class="divide-y divide-gray-100 text-gray-700 bg-white"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= REPORT WIP VIEW (MATRIX) ================= -->
+        <section id="view-report" class="hidden h-full flex flex-col gap-2 overflow-hidden items-center pb-4">
+            <div class="bento-box w-full max-w-[98%] flex flex-col flex-1 overflow-hidden bg-white relative mt-2 shadow-sm">
+                <div id="matrix-export-wrapper" class="flex flex-col h-full overflow-hidden relative">
+                    <div class="px-4 py-3 bg-gray-900 text-white flex justify-between items-center shrink-0" data-html2canvas-ignore>
+                        <div class="flex items-center gap-2.5">
+                            <div class="bg-brand-500/20 p-1.5 rounded"><i data-lucide="grid" class="w-4 h-4 text-brand-300"></i></div>
+                            <div>
+                                <h2 class="font-bold text-sm tracking-tight leading-none">Resume Analisis Loading (PP CCT)</h2>
+                                <p class="text-[9px] text-gray-400 mt-1 font-medium">Matriks Komprehensif Berdasarkan WPP & Potensi Problem</p>
+                            </div>
+                        </div>
+                        <button onclick="downloadResumeImage()" class="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-md text-[10px] font-bold shadow transition">
+                            <i data-lucide="camera" class="w-3.5 h-3.5"></i> Export Matriks
+                        </button>
+                    </div>
+                    
+                    <div id="matrix-scroll-container" class="overflow-auto flex-1 p-3 bg-gray-50/50">
+                        <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden inline-block min-w-full">
+                            <table class="excel-table whitespace-nowrap bg-white w-full" id="the-matrix-table">
+                                <thead class="sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th class="w-16">PERIODE</th><th class="w-12">WPP</th><th class="w-32 text-left">PROBLEM</th>
+                                        <th class="w-14">ADD (E/A)</th><th class="w-14">CAT (C)</th><th class="w-14">REG (/)</th>
+                                        <th class="w-14">SMC (S)</th><th class="w-14">SMV (-)</th><th class="w-20 bg-gray-200 text-gray-800">Grand Total</th>
+                                        <th class="w-24">REMARKS</th><th class="w-16">%-TAGE</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="matrix-tbody"></tbody>
+                                <tfoot id="matrix-tfoot" class="sticky bottom-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]"></tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SH MATERIAL VIEW ================= -->
+        <section id="view-sh" class="hidden h-full flex flex-col gap-3 overflow-hidden pb-4">
+            <div class="flex justify-between items-center shrink-0 px-2 mt-2">
+                <div>
+                    <h2 class="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight"><i data-lucide="shield-alert" class="text-amber-500 w-5 h-5"></i> Database Shortage Material</h2>
+                    <p class="text-[10px] text-gray-500 font-medium">Relasikan material SH dengan WP untuk mengunci potensi Delay.</p>
+                </div>
+                <button onclick="toggleShForm()" id="btn-toggle-sh" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Tambah Part SH
+                </button>
+            </div>
+            <div id="sh-form-container" class="hidden bento-box border-l-[5px] border-l-amber-400 p-4 shrink-0 bg-amber-50/30 mx-2 shadow-sm">
+                <form id="sh-form" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <div class="md:col-span-2"><label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Part Name</label><input required type="text" id="sh-part" class="w-full text-xs border border-gray-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-md p-2 outline-none transition"></div>
+                    <div><label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Type</label><input required type="text" id="sh-type" class="w-full text-xs border border-gray-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-md p-2 outline-none transition"></div>
+                    <div><label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">MPP</label><input required type="text" id="sh-mpp" class="w-full text-xs border border-gray-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-md p-2 outline-none transition"></div>
+                    <div><label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">WP (Relasi)</label><input required type="text" id="sh-wp" class="w-full text-xs border border-gray-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-md p-2 outline-none uppercase transition" placeholder="Cth: 01S05"></div>
+                    <div><label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Tgl SH / ID</label><input required type="date" id="sh-date" class="w-full text-xs border border-gray-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-md p-2 outline-none transition"></div>
+                    <div class="md:col-span-6 flex justify-end mt-2"><button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold py-2 px-5 rounded-md shadow transition">Simpan & Kunci Relasi</button></div>
+                </form>
+            </div>
+            <div id="sh-cards-container" class="flex-1 overflow-auto grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 content-start pb-2 px-2"></div>
+        </section>
+
+    </main>
+
+    <script>
+        // ==========================================
+        // 1. FIREBASE WRAPPER LOGIC (PENGGANTI INDEXED DB)
+        // ==========================================
+        
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // MASUKKAN KONFIGURASI FIREBASE ANDA DI SINI
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+const firebaseConfig = {
+  apiKey: "AIzaSyDpxgbqlgCbYLKGiKmqw44DMRory_iMFBo",
+  authDomain: "e-wip-7ea42.firebaseapp.com",
+  databaseURL: "https://e-wip-7ea42-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "e-wip-7ea42",
+  storageBucket: "e-wip-7ea42.firebasestorage.app",
+  messagingSenderId: "202301603639",
+  appId: "1:202301603639:web:24c0ee15102abe3080a4b2"
+};
+
+        // Inisialisasi Firebase HANYA jika config sudah diisi (menghindari error saat belum diisi)
+        let isFirebaseActive = false;
+        let db = null;
+        
+        if(firebaseConfig.apiKey !== "MASUKKAN_API_KEY_ANDA_DI_SINI") {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            isFirebaseActive = true;
+        }
+
+        async function saveDB(key, data) {
+            if (!isFirebaseActive) {
+                console.warn("Firebase belum dikonfigurasi! Harap masukkan config Anda.");
+                return;
+            }
+            try { 
+                const serializedData = JSON.stringify(data); 
+                await db.collection("wip_dashboard").doc(key).set({ payload: serializedData }); 
+            } catch(e) { 
+                console.error("Firebase Save Error:", e); 
+                showToast("Gagal menyimpan ke server cloud!", "error"); 
+            }
+        }
+
+        async function loadDB(key) {
+            if (!isFirebaseActive) return null;
+            try { 
+                const docSnap = await db.collection("wip_dashboard").doc(key).get();
+                if (docSnap.exists) {
+                    return JSON.parse(docSnap.data().payload);
+                }
+                return null;
+            } catch(e) { 
+                console.error("Firebase Load Error:", e); 
+                return null; 
+            }
+        }
+
+        // ==========================================
+        // 2. GLOBALS & HELPERS
+        // ==========================================
+        let globalMasterData = []; 
+        let globalWipData = [];    
+        let globalShMaterials = [];
+        let dailyHistory = [];
+        let controlFilters = {};
+        
+        let globalUniquePeriodeWPP = []; 
+        let globalCutoffPWKey = null; 
+        let globalDelayPWKey = null;  
+
+        let activePeriodeTab = 'ALL';
+        let activeOverviewCat = 'ALL';
+        let activeOverdueWP = 'ALL'; 
+        let activeClosedWP = 'ALL'; 
+        
+        let masterHeaders = []; 
+        let charts = {}; 
+        
+        const CATEGORIES = ['ADD', 'CAT', 'REG', 'SMC', 'SMV'];
+        const dateKeywords = ['STWC', 'TANGGAL', 'DATE', 'HOUSING', 'ASSEMBLING', 'VISUAL', 'CHECKER', 'FINISHING', 'PREDEL', 'RFG'];
+
+        // CHART PLUGIN: BACKGROUND AREA DELAY UNTUK VISUALISASI OUTSTANDING
+        const thresholdBgPlugin = {
+            id: 'thresholdBg',
+            beforeDatasetsDraw: (chart) => {
+                if (!chart.canvas.id.includes('chartLine')) return;
+                
+                const ctx = chart.ctx; const chartArea = chart.chartArea; const xAxis = chart.scales.x;
+                let delayIndex = globalUniquePeriodeWPP.indexOf(globalDelayPWKey);
+                let cutoffIndex = globalUniquePeriodeWPP.indexOf(globalCutoffPWKey);
+                if(cutoffIndex === -1) cutoffIndex = 0;
+                if(delayIndex === -1) delayIndex = 0;
+                
+                let activeDelayIndex = delayIndex - cutoffIndex;
+                if(activeDelayIndex <= 0) return; 
+                
+                let splitPixel = chartArea.left;
+                if (activeDelayIndex > 0 && activeDelayIndex < xAxis.ticks.length) {
+                    let tickPix = xAxis.getPixelForTick(activeDelayIndex); 
+                    let prevTickPix = xAxis.getPixelForTick(activeDelayIndex - 1);
+                    splitPixel = prevTickPix + (tickPix - prevTickPix) / 2;
+                } else if (activeDelayIndex >= xAxis.ticks.length) {
+                    splitPixel = chartArea.right;
+                }
+
+                ctx.save();
+                if (splitPixel > chartArea.left) { 
+                    ctx.fillStyle = 'rgba(254, 226, 226, 0.4)'; 
+                    ctx.fillRect(chartArea.left, chartArea.top, splitPixel - chartArea.left, chartArea.bottom - chartArea.top); 
+                }
+                ctx.restore();
+            }
+        };
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast ${type}`;
+            toast.innerHTML = `<div class="flex items-center gap-2"><i data-lucide="${type === 'success' ? 'check-circle' : 'info'}" class="w-4 h-4"></i>${message}</div>`;
+            container.appendChild(toast); lucide.createIcons(); setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 4000);
+        }
+
+        const safeSetText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = text;
+        }
+
+        function sanitizeHeaders(headersArray) {
+            if (!headersArray) return [];
+            if (typeof headersArray === 'string') headersArray = headersArray.split(',');
+            if (Array.isArray(headersArray)) {
+                if (headersArray.length > 20 && String(headersArray[0]).length === 1 && String(headersArray[1]).length === 1) return []; 
+                return headersArray.filter(h => h && String(h).trim().length > 1);
+            }
+            return [];
+        }
+
+        function getCategoryName(wpStr) {
+            let wp = String(wpStr).toUpperCase();
+            if(wp.includes('E') || wp.includes('A')) return 'ADD'; if(wp.includes('C')) return 'CAT'; if(wp.includes('/')) return 'REG'; if(wp.includes('S')) return 'SMC'; if(wp.includes('-')) return 'SMV'; return 'OTHER';
+        }
+        function getWPP(wpStr) { let match = String(wpStr).trim().match(/^(\d+)/); return match ? match[1] : wpStr; }
+        
+        function isDateColumn(headerName) {
+            let upper = String(headerName).toUpperCase();
+            return dateKeywords.some(kw => upper.includes(kw));
+        }
+
+        function parseExcelDate(value) {
+            if(!value) return null;
+            if(typeof value === 'number') {
+                let d = new Date(Math.round((value - 25569) * 86400 * 1000));
+                return isNaN(d) ? null : d;
+            }
+            if(typeof value === 'string') {
+                let parts = value.split(/[-/]/);
+                if (parts.length === 3) {
+                    if (parts[2].length === 4) return new Date(parts[2], parts[1] - 1, parts[0]);
+                    if (parts[0].length === 4) return new Date(parts[0], parts[1] - 1, parts[2]);
+                }
+                let d = new Date(value);
+                return isNaN(d) ? null : d;
+            }
+            return null;
+        }
+
+        function formatExcelDateStr(value) {
+            let d = parseExcelDate(value);
+            if(d) return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+            return value;
+        }
+
+        function getTodayDateStr() {
+            let d = new Date(); d.setHours(0,0,0,0);
+            return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        }
+
+        function parseIndoDate(str) {
+            if (!str) return 0;
+            let parts = str.split('-'); 
+            if(parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]).getTime();
+            return 0;
+        }
+
+        function createOrUpdateChart(ctxId, type, data, options) {
+            let el = document.getElementById(ctxId); if(!el) return;
+            if(charts[ctxId]) { charts[ctxId].destroy(); } 
+            
+            if(!options) options = {};
+            options.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2.5);
+            
+            charts[ctxId] = new Chart(el.getContext('2d'), { type: type, data: data, options: options, plugins: [thresholdBgPlugin] });
+        }
+
+        // ==========================================
+        // 3. INIT & TAB LOGIC + AUTO RESET
+        // ==========================================
+        window.onload = async function() {
+            lucide.createIcons();
+            Chart.register(ChartDataLabels);
+            Chart.defaults.set('plugins.datalabels', { display: false });
+
+            if (!isFirebaseActive) {
+                showToast("Firebase Belum Dikonfigurasi! Buka file HTML dan masukkan Config Anda.", "warning");
+                document.getElementById('loading-overlay').classList.add('hidden');
+                switchTab('master');
+                return;
+            }
+
+            const overlay = document.getElementById('loading-overlay'); overlay.classList.remove('hidden');
+            
+            globalMasterData = (await loadDB('master_data')) || [];
+            globalWipData = (await loadDB('wip_data')) || [];
+            globalShMaterials = (await loadDB('sh_materials')) || [];
+            dailyHistory = (await loadDB('daily_history')) || [];
+            globalCutoffPWKey = await loadDB('global_cutoff_key');
+            globalDelayPWKey = await loadDB('global_delay_key');
+            masterHeaders = sanitizeHeaders(await loadDB('master_headers'));
+
+            let lastWipDate = await loadDB('last_wip_date');
+            let todayStr = getTodayDateStr();
+
+            if (lastWipDate && lastWipDate !== todayStr && globalWipData.length > 0) {
+                globalWipData = [];
+                await saveDB('wip_data', []);
+                showToast("Hari baru dimulai! Data WIP kemarin telah dibersihkan otomatis.", "warning");
+            }
+
+            if(globalMasterData.length > 0) {
+                updateWipDependencies();
+                updateInputStats(); 
+                updateGlobalThresholdUI(); 
+                try { setupControlHeaders(); } catch(e) { console.error(e); }
+                document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
+                document.getElementById('global-threshold-bar').classList.remove('hidden');
+                document.getElementById('btn-reset').classList.remove('hidden');
+                switchTab('overview');
+            } else { switchTab('master'); }
+            overlay.classList.add('hidden');
+        };
+
+        function updateWipDependencies() {
+            let uniqueSet = new Set();
+            globalWipData.forEach(r => {
+                let periode = String(r['PERIODE'] || '').trim(); let wppVal = getWPP(r['WP']);
+                if(periode && wppVal && wppVal !== '-') uniqueSet.add(periode + '_' + wppVal);
+            });
+            globalUniquePeriodeWPP = Array.from(uniqueSet).sort((a,b) => {
+                let [perA, wpA] = a.split('_'); let [perB, wpB] = b.split('_');
+                if (perA !== perB) return perA.localeCompare(perB); return parseInt(wpA) - parseInt(wpB);
+            });
+            if(!globalCutoffPWKey && globalUniquePeriodeWPP.length > 0) globalCutoffPWKey = globalUniquePeriodeWPP[0];
+            if(!globalDelayPWKey && globalUniquePeriodeWPP.length > 0) globalDelayPWKey = globalUniquePeriodeWPP[0];
+        }
+
+        function switchTab(tabId) {
+            ['overview', 'report', 'control', 'sh', 'master', 'input'].forEach(id => {
+                let view = document.getElementById(`view-${id}`); if(view) view.classList.add('hidden');
+                let btn = document.getElementById(`btn-tab-${id}`);
+                if(btn) {
+                    if(id === 'overview') btn.className = "px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-500 hover:text-gray-800 border border-transparent";
+                    else if(id === 'master' || id === 'input') btn.className = `px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 flex items-center gap-1.5`;
+                    else btn.className = "px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800";
+                }
+            });
+
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            let activeBtn = document.getElementById(`btn-tab-${tabId}`);
+            if(activeBtn) {
+                if(tabId === 'overview') activeBtn.className = "px-3 py-1.5 rounded-md text-xs font-semibold transition bg-brand-50 text-brand-700 border border-brand-200 shadow-sm";
+                else if(tabId === 'master' || tabId === 'input') activeBtn.className = "px-3 py-1.5 rounded-md text-xs font-semibold transition text-white bg-indigo-600 shadow flex items-center gap-1.5";
+                else activeBtn.className = "px-3 py-1.5 rounded text-xs font-semibold transition bg-white shadow-sm text-gray-800 border border-gray-200";
+            }
+
+            if(tabId === 'overview') renderOverviewDashboard();
+            if(tabId === 'report') renderReportWIP();
+            if(tabId === 'control') { renderControlPeriodeTabs(); renderControlOutstanding(); }
+            if(tabId === 'sh') renderShMaterials();
+            if(tabId === 'master') safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
+            if(tabId === 'input') updateInputStats();
+            lucide.createIcons();
+        }
+
+        async function resetData() {
+            if(confirm("Yakin melakukan Factory Reset? Seluruh Data Master, WIP, dan SH Material akan dihapus permanen di Server Cloud.")) {
+                globalMasterData = []; globalWipData = []; globalUniquePeriodeWPP = []; dailyHistory = []; 
+                globalCutoffPWKey = null; globalDelayPWKey = null; masterHeaders = []; activePeriodeTab = 'ALL'; activeOverviewCat = 'ALL'; activeOverdueWP = 'ALL'; activeClosedWP = 'ALL';
+                await saveDB('master_data', []); await saveDB('wip_data', []); await saveDB('daily_history', []); 
+                await saveDB('global_cutoff_key', null); await saveDB('global_delay_key', null); await saveDB('master_headers', []);
+                document.getElementById('nav-center-menus').classList.remove('flex'); document.getElementById('nav-center-menus').classList.add('hidden');
+                document.getElementById('global-threshold-bar').classList.add('hidden');
+                document.getElementById('btn-reset').classList.add('hidden');
+                updateInputStats(); switchTab('master'); showToast('Factory Reset Berhasil.', 'success');
+            }
+        }
+
+        async function resetMasterData() {
+            if(confirm("Hapus SELURUH Master Data MPP dari Server? Tindakan ini tidak dapat dibatalkan.")) {
+                globalMasterData = []; masterHeaders = []; activePeriodeTab = 'ALL';
+                await saveDB('master_data', []); await saveDB('master_headers', []);
+                safeSetText('info-master-count', '0 Assy');
+                showToast('Database Master telah dikosongkan.', 'success');
+                try { setupControlHeaders(); } catch(e){} renderOverviewDashboard();
+            }
+        }
+
+        async function resetWipData() {
+            if(confirm("Hapus Data WIP Harian dari Server? Ini akan mengosongkan matriks Resume Analisis.")) {
+                globalWipData = [];
+                await saveDB('wip_data', []); await saveDB('last_wip_date', null);
+                safeSetText('info-last-sync', '-');
+                updateWipDependencies(); renderOverviewDashboard(); renderReportWIP();
+                showToast('Data WIP Harian telah dikosongkan.', 'success');
+            }
+        }
+
+        function updateInputStats() {
+            loadDB('last_wip_date').then(date => { safeSetText('info-last-sync', date ? date : '-'); });
+        }
+
+        function setLoaderState(title, desc, pct, rowsTxt) {
+            safeSetText('loading-title', title); safeSetText('loading-desc', desc);
+            document.getElementById('loading-bar').style.width = pct + '%'; 
+            safeSetText('loading-pct', pct + '%');
+            if(rowsTxt) safeSetText('loading-rows', rowsTxt);
+        }
+
+        // ==========================================
+        // 4. UPLOAD & PARSING LOGIC
+        // ==========================================
+        
+        const dropZoneMaster = document.getElementById('drop-zone-master'); const fileInputMaster = document.getElementById('file-input-master');
+        dropZoneMaster.addEventListener('click', () => fileInputMaster.click());
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => { dropZoneMaster.addEventListener(e, preventD, false); document.body.addEventListener(e, preventD, false); });
+        ['dragenter', 'dragover'].forEach(e => dropZoneMaster.addEventListener(e, () => dropZoneMaster.classList.add('drag-active'), false));
+        ['dragleave', 'drop'].forEach(e => dropZoneMaster.addEventListener(e, () => dropZoneMaster.classList.remove('drag-active'), false));
+        dropZoneMaster.addEventListener('drop', (e) => { if(e.dataTransfer.files.length > 0) processMasterExcel(e.dataTransfer.files[0]); });
+        fileInputMaster.addEventListener('change', (e) => { if(e.target.files.length > 0) processMasterExcel(e.target.files[0]); });
+
+        function preventD(e) { e.preventDefault(); e.stopPropagation(); }
+
+        function processMasterExcel(file) {
+            if(!isFirebaseActive) { showToast("Firebase belum aktif!", "error"); return; }
+            const overlay = document.getElementById('loading-overlay'); overlay.classList.remove('hidden');
+            setLoaderState('Membaca Master Data...', 'Mengekstrak seluruh Sheet (Kecuali Summary).', 0, '');
+
+            setTimeout(() => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result); 
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        
+                        let newAssyCount = 0; let updatedAssyCount = 0;
+                        let globalHeadersMap = new Set();
+                        
+                        let totalSheets = workbook.SheetNames.length;
+                        let sheetsToProcess = totalSheets > 1 ? totalSheets - 1 : 1; 
+                        let sheetsProcessed = 0;
+
+                        function processNextSheet() {
+                            if (sheetsProcessed >= sheetsToProcess) {
+                                masterHeaders = sanitizeHeaders(Array.from(globalHeadersMap));
+                                (async () => {
+                                    await saveDB('master_data', globalMasterData);
+                                    await saveDB('master_headers', masterHeaders);
+                                    
+                                    try { setupControlHeaders(); } catch(e){}
+                                    updateInputStats(); updateGlobalThresholdUI();
+                                    
+                                    document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
+                                    document.getElementById('global-threshold-bar').classList.remove('hidden');
+                                    document.getElementById('btn-reset').classList.remove('hidden');
+                                    
+                                    overlay.classList.add('hidden');
+                                    showToast(`Master Update dari ${sheetsToProcess} Sheet: ${newAssyCount} Baru, ${updatedAssyCount} Diperbarui.`, 'success');
+                                    safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
+                                    
+                                    if(globalWipData.length > 0) recalculateValidation();
+                                    else switchTab('overview');
+                                })();
+                                return;
+                            }
+
+                            let sheetName = workbook.SheetNames[sheetsProcessed];
+                            let pct = Math.floor(((sheetsProcessed + 1) / sheetsToProcess) * 100);
+                            setLoaderState('Parsing Sheet...', `Memproses: ${sheetName}`, pct, `Sheet ${sheetsProcessed + 1} / ${sheetsToProcess}`);
+                            
+                            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header: 1});
+
+                            let headerIndex = -1;
+                            for (let i = 0; i < jsonData.length; i++) { 
+                                if (!jsonData[i] || !Array.isArray(jsonData[i])) continue;
+                                let rowStr = jsonData[i].map(c => String(c).toUpperCase()).join('|');
+                                if (rowStr.includes('CUSTOMER') && rowStr.includes('ASSY')) { headerIndex = i; break; } 
+                            }
+                            
+                            if(headerIndex !== -1) {
+                                let rawHeaders = jsonData[headerIndex];
+                                let mappedHeaders = rawHeaders.map(h => {
+                                    if (!h) return '';
+                                    let cleanH = String(h).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+                                    if (cleanH === 'ASSY NO' || cleanH === 'ASSY NO.') return 'ASSY';
+                                    if (cleanH === 'TOTAL CCT ') return 'TOTAL CCT'; 
+                                    return cleanH;
+                                });
+                                mappedHeaders.forEach(h => { if(h) globalHeadersMap.add(h); });
+
+                                for (let i = headerIndex + 1; i < jsonData.length; i++) {
+                                    const row = jsonData[i]; if(!row || row.length === 0) continue;
+                                    let obj = {};
+                                    mappedHeaders.forEach((h, index) => { 
+                                        if(h && row[index] !== undefined) {
+                                            let val = row[index];
+                                            if (isDateColumn(h) && typeof val === 'number' && val > 30000) obj[h] = formatExcelDateStr(val);
+                                            else obj[h] = val;
+                                        } 
+                                    });
+                                    
+                                    if(!obj['ASSY']) continue;
+                                    
+                                    let lineVal = String(obj['LINE'] || obj['LINE '] || '').toUpperCase();
+                                    if (lineVal.includes('PROTO') || /\bPT\b/.test(lineVal) || lineVal === 'LINE PT') continue;
+
+                                    let assyStr = String(obj['ASSY']).trim().toUpperCase();
+                                    let perStr = String(obj['PERIODE'] || '').trim().toUpperCase();
+                                    let wpStr = String(obj['WP'] || '').trim().toUpperCase();
+                                    
+                                    let uid = `${assyStr}_${perStr}_${wpStr}`;
+
+                                    let existing = globalMasterData.find(m => m._uid === uid);
+                                    if(existing) {
+                                        Object.assign(existing, obj); 
+                                        if(!existing._status) existing._status = 'OPEN';
+                                        updatedAssyCount++;
+                                    } else {
+                                        obj._uid = uid;
+                                        obj._status = 'OPEN'; 
+                                        globalMasterData.push(obj);
+                                        newAssyCount++;
+                                    }
+                                }
+                            }
+                            sheetsProcessed++; setTimeout(processNextSheet, 10); 
+                        }
+                        processNextSheet();
+                    } catch(err) { overlay.classList.add('hidden'); showToast("Error: " + err.message, 'error'); }
+                };
+                reader.readAsArrayBuffer(file);
+            }, 100);
+        }
+
+        const dropZoneWip = document.getElementById('drop-zone-wip'); const fileInputWip = document.getElementById('file-input-wip');
+        dropZoneWip.addEventListener('click', () => fileInputWip.click());
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => { dropZoneWip.addEventListener(e, preventD, false); document.body.addEventListener(e, preventD, false); });
+        ['dragenter', 'dragover'].forEach(e => dropZoneWip.addEventListener(e, () => dropZoneWip.classList.add('drag-active'), false));
+        ['dragleave', 'drop'].forEach(e => dropZoneWip.addEventListener(e, () => dropZoneWip.classList.remove('drag-active'), false));
+        dropZoneWip.addEventListener('drop', (e) => { if(e.dataTransfer.files.length > 0) processWIPExcel(e.dataTransfer.files[0]); });
+        fileInputWip.addEventListener('change', (e) => { if(e.target.files.length > 0) processWIPExcel(e.target.files[0]); });
+
+        function processWIPExcel(file) {
+            if(!isFirebaseActive) { showToast("Firebase belum aktif!", "error"); return; }
+            if(globalMasterData.length === 0) { showToast('Upload Master Data (MPP) terlebih dahulu sebelum validasi WIP!', 'warning'); return; }
+            
+            const overlay = document.getElementById('loading-overlay'); overlay.classList.remove('hidden');
+            setLoaderState('Menyiapkan Validasi...', 'Membaca WIP Harian.', 0, '');
+
+            let today = new Date(); today.setHours(0,0,0,0);
+            let todayStr = getTodayDateStr();
+            let todayTime = today.getTime();
+
+            setTimeout(() => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, {type: 'array'});
+                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+
+                        let headerIndex = -1;
+                        for (let i = 0; i < jsonData.length; i++) { 
+                            if (!jsonData[i] || !Array.isArray(jsonData[i])) continue;
+                            let rowStr = jsonData[i].map(c => String(c).toUpperCase()).join('|');
+                            if (rowStr.includes('CUSTOMER') && rowStr.includes('ASSY')) { headerIndex = i; break; } 
+                        }
+
+                        if(headerIndex !== -1) {
+                            let rawHeaders = jsonData[headerIndex];
+                            let headers = rawHeaders.map(h => {
+                                if(!h) return '';
+                                let cleanH = String(h).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+                                if (cleanH === 'ASSY NO' || cleanH === 'ASSY NO.') return 'ASSY';
+                                return cleanH;
+                            });
+                            
+                            if(!headers[2] || String(headers[2]).trim() === '') headers[2] = 'LINE';
+
+                            let wipUidSet = new Set();
+                            let parsedWipData = []; 
+                            let wipRowMap = new Map();
+                            
+                            for (let i = headerIndex + 1; i < jsonData.length; i++) {
+                                const row = jsonData[i]; if(!row || row.length === 0 || !row[0]) continue;
+                                let obj = {}; 
+                                headers.forEach((cleanH, idx) => { 
+                                    if(cleanH) { 
+                                        if(obj[cleanH]) cleanH+="_2"; 
+                                        let val = row[idx];
+                                        if (isDateColumn(cleanH) && typeof val === 'number' && val > 30000) obj[cleanH] = formatExcelDateStr(val);
+                                        else obj[cleanH] = val;
+                                    } 
+                                });
+
+                                let lineVal = String(obj['LINE'] || '').toUpperCase();
+                                if (lineVal.includes('PROTO') || /\bPT\b/.test(lineVal) || lineVal === 'LINE PT') continue;
+
+                                let ppValRaw = String(obj['PP'] || '').trim();
+                                if (ppValRaw === '-' || ppValRaw === '') continue; 
+                                let ppVal = parseFloat(ppValRaw);
+                                if(isNaN(ppVal) || ppVal <= 0) continue; 
+
+                                let assy = String(obj['ASSY'] || '').trim().toUpperCase();
+                                let perStr = String(obj['PERIODE'] || '').trim().toUpperCase();
+                                let wpStr = String(obj['WP'] || '').trim().toUpperCase();
+                                let uid = `${assy}_${perStr}_${wpStr}`;
+                                
+                                if(assy) wipUidSet.add(uid);
+                                obj._uid = uid;
+                                parsedWipData.push(obj);
+                                wipRowMap.set(uid, obj);
+                            }
+
+                            setLoaderState('Cross-Validation...', 'Mencocokkan Master vs WIP', 50, '');
+                            let closedCount = 0; let cnd3Count = 0; let cnd2Count = 0; let openCount = 0;
+                            
+                            // VALIDASI MUTLAK
+                            globalMasterData.forEach(masterRow => {
+                                let uid = masterRow._uid;
+                                let stwcTime = parseIndoDate(masterRow['STWC']);
+                                let stwcDateObj = stwcTime > 0 ? new Date(stwcTime) : null;
+                                if (stwcDateObj) stwcDateObj.setHours(0,0,0,0);
+                                let diffDays = stwcDateObj ? (todayTime - stwcDateObj.getTime()) / 86400000 : 0;
+                                
+                                let wipRow = wipRowMap.get(uid);
+                                let isWipCnd3 = wipRow && String(wipRow['CND'] || '').toUpperCase().includes('CND 3');
+
+                                if (!wipUidSet.has(uid)) {
+                                    if(masterRow._status !== 'CLOSED') { masterRow._closedDate = todayStr; closedCount++; }
+                                    masterRow._status = 'CLOSED';
+                                } else {
+                                    if (isWipCnd3 || diffDays >= 2) {
+                                        masterRow._status = 'CND 3'; cnd3Count++;
+                                    } else if (diffDays === 1) {
+                                        masterRow._status = 'CND 2'; cnd2Count++;
+                                    } else {
+                                        masterRow._status = 'OPEN'; openCount++;
+                                    }
+                                }
+                            });
+
+                            globalWipData = parsedWipData;
+                            updateWipDependencies();
+
+                            let totalAct = openCount + cnd3Count + cnd2Count;
+                            let pctOnSched = totalAct > 0 ? (openCount / totalAct) * 100 : 0;
+                            let newHistoryEntry = { dateKey: todayStr, label: new Date().toLocaleDateString('id-ID', {day:'numeric', month:'short'}), cnd3: cnd3Count + cnd2Count, open: openCount, closed: globalMasterData.filter(m=>m._status==='CLOSED').length, pct: pctOnSched, catPct: {} };
+                            
+                            let existingHistoryIdx = dailyHistory.findIndex(h => h.dateKey === todayStr);
+                            if(existingHistoryIdx !== -1) dailyHistory[existingHistoryIdx] = newHistoryEntry;
+                            else dailyHistory.push(newHistoryEntry);
+
+                            (async () => {
+                                await saveDB('master_data', globalMasterData); 
+                                await saveDB('wip_data', globalWipData); 
+                                await saveDB('daily_history', dailyHistory);
+                                await saveDB('last_wip_date', todayStr);
+                                
+                                updateInputStats(); updateGlobalThresholdUI(); try { setupControlHeaders(); } catch(e){}
+                                document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
+                                document.getElementById('global-threshold-bar').classList.remove('hidden');
+                                document.getElementById('btn-reset').classList.remove('hidden');
+                                overlay.classList.add('hidden');
+                                showToast(`Validasi Tersimpan di Cloud: ${closedCount} Closed, ${cnd2Count} Warning, ${cnd3Count} Overdue.`, 'success');
+                                switchTab('overview');
+                            })();
+
+                        } else { overlay.classList.add('hidden'); showToast("Format File WIP Salah.", 'error'); }
+                    } catch(err) { overlay.classList.add('hidden'); showToast("Error: " + err.message, 'error'); }
+                };
+                reader.readAsArrayBuffer(file);
+            }, 100);
+        }
+
+        // ==========================================
+        // 5. DASHBOARD OVERVIEW & MULTI THRESHOLD
+        // ==========================================
+        function updateGlobalThresholdUI() {
+            const selCutoff = document.getElementById('cutoff-wpp-select');
+            const selDelay = document.getElementById('delay-wpp-select');
+            
+            let html = globalUniquePeriodeWPP.length === 0 ? `<option value="">- Data Kosong -</option>` : '';
+            globalUniquePeriodeWPP.forEach(key => { 
+                let [per, wp] = key.split('_'); 
+                html += `<option value="${key}">Periode: ${per} - WPP: ${wp}</option>`; 
+            });
+            
+            if(selCutoff && selDelay) {
+                selCutoff.innerHTML = html; selDelay.innerHTML = html;
+                if(globalCutoffPWKey) selCutoff.value = globalCutoffPWKey;
+                if(globalDelayPWKey) selDelay.value = globalDelayPWKey;
+            }
+        }
+
+        async function updateCutoffThreshold(val) { globalCutoffPWKey = val; await saveDB('global_cutoff_key', val); refreshDashboards(); }
+        async function updateDelayThreshold(val) { globalDelayPWKey = val; await saveDB('global_delay_key', val); refreshDashboards(); }
+
+        function refreshDashboards() {
+            if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
+            if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
+        }
+
+        async function recalculateValidation() {
+            if(!isFirebaseActive) return;
+            if (globalWipData.length === 0 || globalMasterData.length === 0) {
+                showToast('Data Master atau WIP kosong.', 'warning');
+                return;
+            }
+
+            let today = new Date(); today.setHours(0,0,0,0);
+            let todayStr = getTodayDateStr();
+            let todayTime = today.getTime();
+
+            let wipUidSet = new Set();
+            let wipRowMap = new Map();
+            globalWipData.forEach(row => {
+                let uid = row._uid;
+                if(uid) { wipUidSet.add(uid); wipRowMap.set(uid, row); }
+            });
+
+            let closedCount = 0; let cnd3Count = 0; let cnd2Count = 0; let openCount = 0;
+
+            globalMasterData.forEach(masterRow => {
+                let uid = masterRow._uid;
+                let stwcTime = parseIndoDate(masterRow['STWC']);
+                let stwcDateObj = stwcTime > 0 ? new Date(stwcTime) : null;
+                if (stwcDateObj) stwcDateObj.setHours(0,0,0,0);
+                let diffDays = stwcDateObj ? (todayTime - stwcDateObj.getTime()) / 86400000 : 0;
+                
+                let wipRow = wipRowMap.get(uid);
+                let isWipCnd3 = wipRow && String(wipRow['CND'] || '').toUpperCase().includes('CND 3');
+
+                if (!wipUidSet.has(uid)) {
+                    if(masterRow._status !== 'CLOSED') { masterRow._closedDate = todayStr; closedCount++; }
+                    masterRow._status = 'CLOSED';
+                } else {
+                    if (isWipCnd3 || diffDays >= 2) {
+                        masterRow._status = 'CND 3'; cnd3Count++;
+                    } else if (diffDays === 1) {
+                        masterRow._status = 'CND 2'; cnd2Count++;
+                    } else {
+                        masterRow._status = 'OPEN'; openCount++;
+                    }
+                }
+            });
+
+            let totalAct = openCount + cnd3Count + cnd2Count;
+            let pctOnSched = totalAct > 0 ? (openCount / totalAct) * 100 : 0;
+            let newHistoryEntry = { dateKey: todayStr, label: new Date().toLocaleDateString('id-ID', {day:'numeric', month:'short'}), cnd3: cnd3Count + cnd2Count, open: openCount, closed: globalMasterData.filter(m=>m._status==='CLOSED').length, pct: pctOnSched, catPct: {} };
+            
+            let existingHistoryIdx = dailyHistory.findIndex(h => h.dateKey === todayStr);
+            if(existingHistoryIdx !== -1) {
+                dailyHistory[existingHistoryIdx].cnd3 = cnd3Count + cnd2Count;
+                dailyHistory[existingHistoryIdx].open = openCount;
+                dailyHistory[existingHistoryIdx].closed = globalMasterData.filter(m=>m._status==='CLOSED').length;
+                dailyHistory[existingHistoryIdx].pct = pctOnSched;
+            } else {
+                dailyHistory.push(newHistoryEntry);
+            }
+
+            await saveDB('master_data', globalMasterData);
+            await saveDB('daily_history', dailyHistory);
+
+            showToast('Rekalkulasi Server Cloud Selesai.', 'success');
+            refreshDashboards();
+            try { renderControlOutstanding(); } catch(e){}
+        }
+
+        // Context Switcher logic
+        function setOverviewCat(cat) { activeOverviewCat = cat; renderOverviewDashboard(); }
+        function setOverdueWPFilter(wpType) { activeOverdueWP = wpType; renderOverviewDashboard(); }
+        function setClosedWPFilter(wpType) { activeClosedWP = wpType; renderOverviewDashboard(); }
+
+        function downloadOverviewImage() {
+            const target = document.getElementById('view-overview-export-wrapper');
+            const btns = document.getElementById('overview-export-buttons-hide');
+            if(btns) btns.style.display = 'none';
+
+            html2canvas(target, { scale: 2, backgroundColor: '#f4f5f7', logging: false }).then(canvas => {
+                if(btns) btns.style.display = 'flex';
+                const link = document.createElement('a'); link.download = `Dashboard_Executive_${new Date().toISOString().replace(/[:.]/g, '-')}.png`; link.href = canvas.toDataURL('image/png'); link.click();
+            }).catch(err => { if(btns) btns.style.display = 'flex'; showToast('Gagal Export Dashboard', 'error'); });
+        }
+
+        window.openDrilldownModal = function(pwKey, catName) {
+            const modal = document.getElementById('drilldown-modal');
+            const title = document.getElementById('drilldown-title');
+            const tbody = document.getElementById('drilldown-tbody');
+            
+            let [per, wpp] = pwKey.split('_');
+            title.innerText = `List Assy - Periode ${per} | WPP ${wpp} (${catName})`;
+            
+            let filtered = globalMasterData.filter(m => {
+                if(m._status === 'CLOSED') return false; 
+                let mPer = String(m['PERIODE'] || '').trim();
+                let mWpp = getWPP(String(m['WP'] || '').trim());
+                let mCat = getCategoryName(m['WP']);
+                if(mPer !== per || mWpp !== wpp) return false;
+                if(catName !== 'ALL' && catName !== 'GRAND' && mCat !== catName) return false;
+                return true;
+            });
+
+            filtered.sort((a,b) => {
+                let st = {'CND 3':1, 'CND 2':2, 'OPEN':3};
+                return (st[a._status] || 99) - (st[b._status] || 99);
+            });
+
+            let totalList = filtered.length;
+            let totalCct = filtered.reduce((sum, m) => sum + (parseFloat(m['TOTAL CCT']) || 0), 0);
+            document.getElementById('drilldown-subtitle').innerHTML = `Total List Assy: <strong>${totalList}</strong> &nbsp;|&nbsp; Total CCT: <strong>${totalCct.toLocaleString()}</strong>`;
+
+            let html = '';
+            filtered.forEach(m => {
+                let badge = m._status === 'CND 3' ? '<span class="bg-red-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CND 3</span>' : 
+                            m._status === 'CND 2' ? '<span class="bg-amber-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CND 2</span>' :
+                            '<span class="bg-blue-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">OPEN</span>';
+                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition"><td class="p-2.5 text-center">${badge}</td><td class="p-2.5 font-bold text-gray-800">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500">${m.WP||'-'}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center">${m.QTY||'-'}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${m['TOTAL CCT']||'-'}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px]">${m.CUSTOMER||'-'}</td></tr>`;
+            });
+            
+            if(filtered.length === 0) html = '<tr><td colspan="7" class="text-center p-6 text-gray-400 font-medium">Tidak ada data aktif di WPP ini.</td></tr>';
+            
+            tbody.innerHTML = html;
+            modal.classList.remove('hidden');
+        }
+
+        window.closeDrilldown = function() {
+            document.getElementById('drilldown-modal').classList.add('hidden');
+        }
+
+        function renderOverviewDashboard() {
+            const catBtnsContainer = document.getElementById('overview-cat-buttons');
+            if(catBtnsContainer) {
+                let btnHtml = '';
+                ['ALL', ...CATEGORIES].forEach(cat => {
+                    let activeClass = activeOverviewCat === cat ? 'bg-white text-gray-800 shadow-sm border border-gray-200' : 'text-gray-500 hover:bg-white/50 border border-transparent';
+                    btnHtml += `<button onclick="setOverviewCat('${cat}')" class="px-3 py-1 text-[10px] font-bold rounded-md transition ${activeClass}">${cat}</button>`;
+                });
+                catBtnsContainer.innerHTML = btnHtml;
+            }
+
+            let cutoffIndex = globalUniquePeriodeWPP.indexOf(globalCutoffPWKey); 
+            if(cutoffIndex === -1) cutoffIndex = 0;
+            let delayIndex = globalUniquePeriodeWPP.indexOf(globalDelayPWKey);
+            if(delayIndex === -1) delayIndex = 0;
+
+            let activeMasterData = globalMasterData.filter(m => {
+                let rPer = String(m['PERIODE'] || '-').trim();
+                let rWp = getWPP(String(m['WP'] || '-').trim());
+                
+                if (activeOverviewCat !== 'ALL') {
+                    if (getCategoryName(m.WP) !== activeOverviewCat) return false;
+                }
+
+                if (globalCutoffPWKey) {
+                    let [cutPer, cutWp] = globalCutoffPWKey.split('_');
+                    if (!rPer || rPer === '-' || !rWp || rWp === '-' || rWp === 'undefined') return true; 
+                    if (rPer < cutPer) return false;
+                    if (rPer === cutPer && parseInt(rWp) < parseInt(cutWp)) return false;
+                }
+                return true;
+            });
+
+            let tMaster = activeMasterData.length;
+            let tCnd3 = activeMasterData.filter(m => m._status === 'CND 3').length;
+            let tCnd2 = activeMasterData.filter(m => m._status === 'CND 2').length;
+            let tClosed = activeMasterData.filter(m => m._status === 'CLOSED').length;
+            let tOpen = activeMasterData.filter(m => m._status === 'OPEN').length;
+            
+            safeSetText('ov-master-total', tMaster.toLocaleString());
+            safeSetText('ov-master-cnd3', tCnd3.toLocaleString());
+            safeSetText('ov-master-cnd2', tCnd2.toLocaleString());
+            safeSetText('ov-master-closed', tClosed.toLocaleString());
+            safeSetText('ov-master-onsched', tOpen.toLocaleString());
+
+            let todayStr = getTodayDateStr();
+            let closedToday = activeMasterData.filter(m => m._status === 'CLOSED' && m._closedDate === todayStr);
+            let overdueList = activeMasterData.filter(m => m._status === 'CND 3' || m._status === 'CND 2');
+            
+            if(activeOverdueWP !== 'ALL') {
+                overdueList = overdueList.filter(m => {
+                    let w = String(m['WP'] || '').toUpperCase();
+                    if(activeOverdueWP === 'REG') return w.includes('/');
+                    if(activeOverdueWP === 'SMV') return w.includes('-');
+                    return w.includes(activeOverdueWP);
+                });
+            }
+
+            if(activeClosedWP !== 'ALL') {
+                closedToday = closedToday.filter(m => {
+                    let w = String(m['WP'] || '').toUpperCase();
+                    if(activeClosedWP === 'REG') return w.includes('/');
+                    if(activeClosedWP === 'SMV') return w.includes('-');
+                    return w.includes(activeClosedWP);
+                });
+            }
+
+            closedToday.sort((a, b) => parseIndoDate(a['STWC']) - parseIndoDate(b['STWC']));
+            overdueList.sort((a, b) => parseIndoDate(a['STWC']) - parseIndoDate(b['STWC']));
+
+            const ovWpFilterContainer = document.getElementById('overdue-wp-filters');
+            if(ovWpFilterContainer) {
+                let wpFiltersHtml = '';
+                const filterBtns = [ {l:'ALL', v:'ALL'}, {l:'ADD (E/A)', v:'E'}, {l:'CAT (C)', v:'C'}, {l:'REG (/)', v:'REG'}, {l:'SMC (S)', v:'S'}, {l:'SMV (-)', v:'SMV'} ];
+                filterBtns.forEach(fb => {
+                    let actClass = activeOverdueWP === fb.v ? 'bg-red-500 text-white shadow-sm border-red-600' : 'bg-white text-gray-500 border-transparent hover:bg-gray-50 hover:text-red-500';
+                    wpFiltersHtml += `<button onclick="setOverdueWPFilter('${fb.v}')" class="px-2 py-0.5 text-[8px] font-bold rounded border transition whitespace-nowrap ${actClass}">${fb.l}</button>`;
+                });
+                ovWpFilterContainer.innerHTML = wpFiltersHtml;
+            }
+
+            const clWpFilterContainer = document.getElementById('closed-wp-filters');
+            if(clWpFilterContainer) {
+                let clFiltersHtml = '';
+                const filterBtns = [ {l:'ALL', v:'ALL'}, {l:'ADD (E/A)', v:'E'}, {l:'CAT (C)', v:'C'}, {l:'REG (/)', v:'REG'}, {l:'SMC (S)', v:'S'}, {l:'SMV (-)', v:'SMV'} ];
+                filterBtns.forEach(fb => {
+                    let actClass = activeClosedWP === fb.v ? 'bg-emerald-500 text-white shadow-sm border-emerald-600' : 'bg-white text-gray-500 border-transparent hover:bg-gray-50 hover:text-emerald-500';
+                    clFiltersHtml += `<button onclick="setClosedWPFilter('${fb.v}')" class="px-2 py-0.5 text-[8px] font-bold rounded border transition whitespace-nowrap ${actClass}">${fb.l}</button>`;
+                });
+                clWpFilterContainer.innerHTML = clFiltersHtml;
+            }
+
+            safeSetText('ov-closed-today-count', closedToday.length.toString());
+            const listEl = document.getElementById('overview-closed-list');
+            if(listEl) {
+                if(closedToday.length === 0) listEl.innerHTML = `<div class="text-center text-gray-400 text-[10px] mt-4 font-medium">Belum ada Assy yang selesai hari ini.</div>`;
+                else {
+                    let logHtml = '';
+                    closedToday.forEach(m => {
+                        logHtml += `<div class="p-1.5 border border-emerald-100 rounded bg-emerald-50 text-[9px] flex justify-between items-center transition hover:bg-emerald-100/50"><span class="font-bold text-gray-800">${m['ASSY'] || '-'} <span class="text-emerald-600 font-normal ml-1">(${m['PERIODE']||'-'} | ${m['WP'] || '-'})</span></span><span class="text-emerald-700 font-bold">${m._closedDate || todayStr}</span></div>`;
+                    });
+                    listEl.innerHTML = logHtml;
+                }
+            }
+
+            safeSetText('ov-overdue-list-count', overdueList.length.toString());
+            const listOverdueEl = document.getElementById('overview-overdue-list');
+            if(listOverdueEl) {
+                if(overdueList.length === 0) listOverdueEl.innerHTML = `<div class="text-center text-gray-400 text-[10px] mt-4 font-medium">Tidak ada Assy yang overdue.</div>`;
+                else {
+                    let logHtml = '';
+                    overdueList.forEach(m => {
+                        let isCnd3 = m._status === 'CND 3';
+                        let bg = isCnd3 ? 'bg-red-50 border-red-100 text-red-600' : 'bg-amber-50 border-amber-100 text-amber-600';
+                        let tColor = isCnd3 ? 'text-red-500' : 'text-amber-500';
+                        logHtml += `<div class="p-1.5 border rounded ${bg} text-[9px] flex justify-between items-center transition hover:opacity-80"><span class="font-bold text-gray-800">${m['ASSY'] || '-'} <span class="${tColor} font-normal ml-1">(${m['PERIODE']||'-'} | ${m['WP']||'-'})</span></span><span class="font-bold font-mono">${m['STWC'] || '-'}</span></div>`;
+                    });
+                    listOverdueEl.innerHTML = logHtml;
+                }
+            }
+
+            // HITUNG MATRIKS & DATA TREN BERDASARKAN FILTER TAB
+            let wppSums = {}; let catSums = { ADD:{}, CAT:{}, REG:{}, SMC:{}, SMV:{} };
+            let catStats = { ADD: {load:0, delay:0, onsched:0, sh:0}, CAT: {load:0, delay:0, onsched:0, sh:0}, REG: {load:0, delay:0, onsched:0, sh:0}, SMC: {load:0, delay:0, onsched:0, sh:0}, SMV: {load:0, delay:0, onsched:0, sh:0} };
+            let kpiTotalLoad = 0; let kpiDelay = 0; let kpiOnSched = 0; let kpiSH = 0;
+            let stackedData = { grand: { sched: [], delay: [], sh: [] }, add: { sched: [], delay: [], sh: [] }, cat: { sched: [], delay: [], sh: [] }, reg: { sched: [], delay: [], sh: [] }, smc: { sched: [], delay: [], sh: [] }, smv: { sched: [], delay: [], sh: [] } };
+
+            if (globalWipData.length > 0) {
+                globalUniquePeriodeWPP.forEach(pwKey => { 
+                    wppSums[pwKey] = 0; CATEGORIES.forEach(c => catSums[c][pwKey] = 0); 
+                    stackedData.grand.sched.push(0); stackedData.grand.delay.push(0); stackedData.grand.sh.push(0);
+                    CATEGORIES.forEach(cat => { stackedData[cat.toLowerCase()].sched.push(0); stackedData[cat.toLowerCase()].delay.push(0); stackedData[cat.toLowerCase()].sh.push(0); });
+                });
+
+                globalWipData.forEach(row => {
+                    const wpRaw = String(row['WP'] || '-').trim(); const pwKey = (row['PERIODE'] || '-') + '_' + getWPP(wpRaw);
+                    const ppCct = parseFloat(row['PP CCT']) || 0; const wpCat = getCategoryName(wpRaw);
+                    let catKey = CATEGORIES.includes(wpCat) ? wpCat : null;
+                    const wppIndex = globalUniquePeriodeWPP.indexOf(pwKey);
+                    
+                    if (wppIndex !== -1 && wppIndex < cutoffIndex) return; 
+
+                    const isDelay = wppIndex < delayIndex; 
+
+                    let isSHInSystem = globalShMaterials.some(sh => String(sh.wp).toUpperCase() === wpRaw.toUpperCase());
+                    let problemStrRaw = Object.keys(row).find(k => k.includes('KETERANGAN') || k.includes('PROBLEM') || k.includes('POTENSI'));
+                    let isPotensiSH = problemStrRaw ? String(row[problemStrRaw]).toUpperCase().includes('SH') : false;
+                    let isSH = isSHInSystem || isPotensiSH;
+
+                    // Aggregate Data berdasarkan filter kategori (Atas)
+                    if (activeOverviewCat === 'ALL' || activeOverviewCat === catKey) {
+                        kpiTotalLoad += ppCct; 
+                        if(isSH) kpiSH += ppCct; else if(isDelay) kpiDelay += ppCct; else kpiOnSched += ppCct;
+                        
+                        if(wppSums[pwKey] !== undefined) wppSums[pwKey] += ppCct;
+                        if(isSH) stackedData.grand.sh[wppIndex] += ppCct;
+                        else if(isDelay) stackedData.grand.delay[wppIndex] += ppCct;
+                        else stackedData.grand.sched[wppIndex] += ppCct;
+                    }
+                    
+                    if(catKey) { 
+                        catStats[catKey].load += ppCct; 
+                        if(isSH) catStats[catKey].sh += ppCct; else if(isDelay) catStats[catKey].delay += ppCct; else catStats[catKey].onsched += ppCct; 
+                    }
+                    
+                    if(catKey && catSums[catKey][pwKey] !== undefined) {
+                        catSums[catKey][pwKey] += ppCct;
+                        if(isSH) stackedData[catKey.toLowerCase()].sh[wppIndex] += ppCct;
+                        else if(isDelay) stackedData[catKey.toLowerCase()].delay[wppIndex] += ppCct;
+                        else stackedData[catKey.toLowerCase()].sched[wppIndex] += ppCct;
+                    }
+                });
+
+                // UPDATE MEMORY HISTORY
+                let existingHistoryIdx = dailyHistory.findIndex(h => h.dateKey === todayStr);
+                let currentGlobalPct = kpiTotalLoad > 0 ? (kpiOnSched / kpiTotalLoad) * 100 : 0;
+                let currentCatPct = {};
+                CATEGORIES.forEach(c => {
+                    let t = catStats[c].load;
+                    currentCatPct[c] = t > 0 ? (catStats[c].onsched / t) * 100 : 0;
+                });
+
+                if (existingHistoryIdx !== -1) {
+                    dailyHistory[existingHistoryIdx].pct = currentGlobalPct;
+                    dailyHistory[existingHistoryIdx].catPct = currentCatPct;
+                    if(isFirebaseActive) saveDB('daily_history', dailyHistory); 
+                }
+            }
+
+            // RENDER DAILY TREND 
+            let dailyLabels = dailyHistory.map(h => h.label);
+            let pctData = dailyHistory.map(h => {
+                if (activeOverviewCat === 'ALL') return h.pct ? h.pct.toFixed(2) : 0;
+                if (h.catPct && h.catPct[activeOverviewCat] !== undefined) return h.catPct[activeOverviewCat].toFixed(2);
+                return h.pct ? h.pct.toFixed(2) : 0;
+            });
+
+            let n = pctData.length; let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+            for (let i = 0; i < n; i++) { let y = parseFloat(pctData[i]); sumX += i; sumY += y; sumXY += i * y; sumX2 += i * i; }
+            let slope = n > 1 ? (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX) : 0;
+            let intercept = n > 0 ? (sumY - slope * sumX) / n : parseFloat(pctData[0] || 0);
+            let trendlineData = []; for (let i = 0; i < n; i++) trendlineData.push((slope * i + intercept).toFixed(2));
+
+            safeSetText('daily-trend-title-cat', activeOverviewCat);
+
+            createOrUpdateChart('chartDailyTrend', 'line', {
+                labels: dailyLabels,
+                datasets: [
+                    { type: 'line', label: 'Trendline', data: trendlineData, borderColor: '#3b82f6', borderDash: [5, 5], borderWidth: 2, fill: false, pointRadius: 0, tension: 0 },
+                    { type: 'line', label: '% On-Schedule', data: pctData, borderColor: '#10b981', 
+                      backgroundColor: (context) => { const ctx = context.chart.ctx; const gradient = ctx.createLinearGradient(0, 0, 0, 200); gradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)'); gradient.addColorStop(1, 'rgba(16, 185, 129, 0)'); return gradient; },
+                      fill: true, tension: 0.4, borderWidth: 2, pointBackgroundColor: '#fff', pointBorderColor: '#10b981', pointRadius: 4 }
+                ]
+            }, { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.raw}%` } }, legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { min: 0, max: 100, border: { dash: [4, 4] } } } });
+
+            if(globalWipData.length === 0) return;
+
+            // RENDER BESAR & KATEGORI CHARTS
+            safeSetText('ov-kpi-load', kpiTotalLoad.toLocaleString());
+            safeSetText('ov-kpi-sh', kpiSH.toLocaleString());
+            safeSetText('ov-kpi-delay', kpiDelay.toLocaleString());
+            safeSetText('ov-kpi-onsched', kpiOnSched.toLocaleString());
+
+            const chartsContainer = document.getElementById('overview-charts-container');
+            if(chartsContainer) chartsContainer.innerHTML = ''; 
+
+            let activeLabels = globalUniquePeriodeWPP.slice(cutoffIndex).map(k => k.split('_')[1]); 
+            let activeGrandDataArray = globalUniquePeriodeWPP.slice(cutoffIndex).map(k => wppSums[k]);
+            
+            const renderBigChart = (chartId, titleText, stats, totalArray, shArray, delayArray, schedArray) => {
+                let t = stats.load; let pctDelay = t > 0 ? Math.round((stats.delay/t)*100) : 0; let pctSched = t > 0 ? Math.round((stats.onsched/t)*100) : 0; let pctSh = t > 0 ? Math.round((stats.sh/t)*100) : 0;
+                
+                let html = `
+                <div class="bento-box bg-white flex flex-col w-full mt-2 shadow-sm border border-gray-200">
+                    <div class="px-5 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-xl shrink-0">
+                        <div>
+                            <h2 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="bar-chart-2" class="w-4 h-4 text-brand-500"></i> ${titleText}</h2>
+                            <p class="text-[10px] text-gray-500 mt-0.5">Area latar belakang merah muda menunjukkan batas Delay (Outstanding).</p>
+                        </div>
+                        <div class="text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest border border-gray-200 bg-white px-3 py-1 rounded shadow-sm">Total Load: <span class="text-sm text-gray-900 font-black ml-1">${t.toLocaleString()}</span></div>
+                    </div>
+                    
+                    <div class="flex flex-col xl:flex-row flex-1 p-5 gap-6 items-stretch">
+                        <!-- Left: Stacked Bar + Line Chart -->
+                        <div class="flex-[3] relative min-h-[300px] w-full cursor-pointer hover:opacity-90 transition" title="Klik pada batang manapun untuk melihat List Assy">
+                            <canvas id="chartLine_${chartId}"></canvas>
+                        </div>
+                        
+                        <!-- Divider -->
+                        <div class="hidden xl:block w-px bg-gray-100 shrink-0 self-stretch my-2"></div>
+                        
+                        <!-- Right: Big Pie Chart + Legend Side by Side -->
+                        <div class="flex-[1.5] min-w-[320px] flex items-center justify-center p-4 bg-gray-50/50 rounded-xl border border-gray-100 shadow-inner">
+                            <div class="w-[200px] h-[200px] relative shrink-0"><canvas id="chartPie_${chartId}"></canvas></div>
+                            
+                            <div class="flex flex-col gap-3 text-[10px] font-bold min-w-[130px] ml-6">
+                                <div class="flex justify-between items-center text-blue-700 bg-blue-50 px-3 py-2 rounded-lg shadow-sm border border-blue-100 hover:bg-blue-100 transition">
+                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">On Sched</span><span class="text-sm text-gray-900">${stats.onsched.toLocaleString()}</span></div>
+                                    <span class="bg-white px-2 py-1 rounded shadow-sm text-blue-600 text-[10px]">${pctSched}%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-red-700 bg-red-50 px-3 py-2 rounded-lg shadow-sm border border-red-100 hover:bg-red-100 transition">
+                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">Delay</span><span class="text-sm text-gray-900">${stats.delay.toLocaleString()}</span></div>
+                                    <span class="bg-white px-2 py-1 rounded shadow-sm text-red-600 text-[10px]">${pctDelay}%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-amber-700 bg-amber-50 px-3 py-2 rounded-lg shadow-sm border border-amber-100 hover:bg-amber-100 transition">
+                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">Shortage</span><span class="text-sm text-gray-900">${stats.sh.toLocaleString()}</span></div>
+                                    <span class="bg-white px-2 py-1 rounded shadow-sm text-amber-600 text-[10px]">${pctSh}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+                if(chartsContainer) chartsContainer.insertAdjacentHTML('beforeend', html);
+                lucide.createIcons();
+
+                createOrUpdateChart(`chartLine_${chartId}`, 'bar', {
+                    labels: activeLabels, datasets: [
+                        { type: 'line', label: 'Trendline', data: totalArray, borderColor: '#475569', borderWidth: 2.5, fill: false, tension: 0.4, pointBackgroundColor: '#ffffff', pointBorderColor: '#475569', pointRadius: 4, pointHoverRadius: 6 },
+                        { type: 'bar', label: 'SH', data: shArray, backgroundColor: '#fbbf24', borderRadius: {topLeft:4, topRight:4, bottomLeft:0, bottomRight:0} },
+                        { type: 'bar', label: 'Delay', data: delayArray, backgroundColor: '#ef4444', borderRadius: {topLeft:4, topRight:4, bottomLeft:0, bottomRight:0} },
+                        { type: 'bar', label: 'On Schedule', data: schedArray, backgroundColor: '#3b82f6', borderRadius: {topLeft:4, topRight:4, bottomLeft:0, bottomRight:0} }
+                    ]
+                }, { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { 
+                        datalabels: { display: function(context) { return context.dataset.type === 'bar' && context.dataset.data[context.dataIndex] > 0; }, color: '#fff', font: { weight: 'bold', size: 9 }, formatter: Math.round }, 
+                        legend: {display: false} 
+                    }, 
+                    scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, border: { dash: [4, 4] } } },
+                    onClick: (e, elements, chart) => {
+                        if (!elements.length) return;
+                        const dataIndex = elements[0].index;
+                        const pwKey = globalUniquePeriodeWPP.slice(cutoffIndex)[dataIndex];
+                        openDrilldownModal(pwKey, chartId === 'GRAND' ? 'ALL' : chartId);
+                    }
+                });
+
+                createOrUpdateChart(`chartPie_${chartId}`, 'doughnut', {
+                    labels: ['Delay', 'On Sched', 'Shortage'],
+                    datasets: [{ data: [stats.delay, stats.onsched, stats.sh], backgroundColor: ['#ef4444', '#3b82f6', '#f59e0b'], borderWidth: 2, borderColor: '#ffffff', hoverOffset: 4 }]
+                }, { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: false },
+                        datalabels: {
+                            display: function(context) { return context.dataset.data[context.dataIndex] > 0; },
+                            formatter: (value, ctx) => { let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); return (value*100 / sum).toFixed(0)+"%"; },
+                            color: '#fff', font: { weight: 'bold', size: 14 }
+                        },
+                        tooltip: { enabled: true }
+                    }, 
+                    cutout: '55%' 
+                });
+            };
+
+            let grandStats = {load:0, delay:0, onsched:0, sh:0};
+            if(activeOverviewCat === 'ALL') {
+                CATEGORIES.forEach(cat => { grandStats.load += catStats[cat].load; grandStats.delay += catStats[cat].delay; grandStats.onsched += catStats[cat].onsched; grandStats.sh += catStats[cat].sh; });
+            } else {
+                grandStats = catStats[activeOverviewCat];
+            }
+
+            renderBigChart(
+                activeOverviewCat === 'ALL' ? 'GRAND' : activeOverviewCat, 
+                activeOverviewCat === 'ALL' ? 'Grand Total Loading Trend (PP CCT)' : `Tren Loading Kategori: ${activeOverviewCat}`, 
+                grandStats, 
+                activeGrandDataArray, 
+                stackedData.grand.sh.slice(cutoffIndex), 
+                stackedData.grand.delay.slice(cutoffIndex), 
+                stackedData.grand.sched.slice(cutoffIndex)
+            );
+
+            if (activeOverviewCat === 'ALL') {
+                CATEGORIES.forEach(cat => {
+                    let catNameLow = cat.toLowerCase();
+                    renderBigChart(
+                        cat, 
+                        `Tren Loading Kategori: ${cat}`, 
+                        catStats[cat], 
+                        globalUniquePeriodeWPP.slice(cutoffIndex).map(k => catSums[cat][k]), 
+                        stackedData[catNameLow].sh.slice(cutoffIndex), 
+                        stackedData[catNameLow].delay.slice(cutoffIndex), 
+                        stackedData[catNameLow].sched.slice(cutoffIndex)
+                    );
+                });
+            }
+        }
+
+        // ==========================================
+        // 6. RESUME MATRIX (REPORT WIP) & EXPORT
+        // ==========================================
+        function downloadResumeImage() {
+            const wrapper = document.getElementById('matrix-export-wrapper');
+            const originalScroll = document.getElementById('matrix-scroll-container');
+            const theTable = document.getElementById('the-matrix-table');
+            
+            const printBox = document.createElement('div');
+            printBox.style.position = 'absolute'; printBox.style.top = '-9999px'; printBox.style.background = '#ffffff'; printBox.style.padding = '20px';
+            
+            const clonedTable = theTable.cloneNode(true);
+            clonedTable.style.width = 'max-content'; 
+            printBox.appendChild(clonedTable);
+            document.body.appendChild(printBox);
+
+            setTimeout(() => {
+                html2canvas(printBox, { scale: 3, backgroundColor: '#ffffff', logging: false }).then(canvas => {
+                    document.body.removeChild(printBox);
+                    const link = document.createElement('a'); link.download = `Matrix_WIP_${new Date().toISOString().replace(/[:.]/g, '-')}.png`; link.href = canvas.toDataURL('image/png'); link.click();
+                }).catch(err => { document.body.removeChild(printBox); showToast('Gagal Export', 'error'); });
+            }, 100);
+        }
+
+        function renderReportWIP() {
+            let matrixData = {}; 
+            let totalFooters = { TOTAL: {ADD:0,CAT:0,REG:0,SMC:0,SMV:0,GRAND:0}, DELAY: {ADD:0,CAT:0,REG:0,SMC:0,SMV:0,GRAND:0}, ONSCHEDULE: {ADD:0,CAT:0,REG:0,SMC:0,SMV:0,GRAND:0} };
+            let cutoffIndex = globalUniquePeriodeWPP.indexOf(globalCutoffPWKey); if(cutoffIndex === -1) cutoffIndex = 0;
+            let delayIndex = globalUniquePeriodeWPP.indexOf(globalDelayPWKey); if(delayIndex === -1) delayIndex = 0;
+
+            globalWipData.forEach(row => {
+                const periode = row['PERIODE'] || '-'; const wpRaw = String(row['WP'] || '-').trim(); const ppCct = parseFloat(row['PP CCT']) || 0; 
+                const wppStr = getWPP(wpRaw); const wpCat = getCategoryName(wpRaw); const pwKey = periode + '_' + wppStr;
+                const itemIndex = globalUniquePeriodeWPP.indexOf(pwKey);
+
+                if (itemIndex !== -1 && itemIndex < cutoffIndex) return; // ABAIKAN CUTOFF
+
+                let isSHInSystem = globalShMaterials.some(sh => String(sh.wp).toUpperCase() === wpRaw.toUpperCase());
+                let problemStrRaw = Object.keys(row).find(k => k.includes('KETERANGAN') || k.includes('PROBLEM') || k.includes('POTENSI'));
+                let isPotensiSH = problemStrRaw ? String(row[problemStrRaw]).toUpperCase().includes('SH') : false;
+                const statusType = (isPotensiSH || isSHInSystem) ? 'SH' : 'OK';
+
+                if (!matrixData[periode]) matrixData[periode] = {};
+                if (!matrixData[periode][wppStr]) matrixData[periode][wppStr] = { OK: {ADD:0,CAT:0,REG:0,SMC:0,SMV:0,RowTotal:0}, SH: {ADD:0,CAT:0,REG:0,SMC:0,SMV:0,RowTotal:0} };
+                
+                if (CATEGORIES.includes(wpCat)) {
+                    matrixData[periode][wppStr][statusType][wpCat] += ppCct; matrixData[periode][wppStr][statusType].RowTotal += ppCct;
+                    totalFooters.TOTAL[wpCat] += ppCct; totalFooters.TOTAL.GRAND += ppCct;
+                    
+                    if (itemIndex < delayIndex) { 
+                        totalFooters.DELAY[wpCat] += ppCct; totalFooters.DELAY.GRAND += ppCct; 
+                    } else { 
+                        totalFooters.ONSCHEDULE[wpCat] += ppCct; totalFooters.ONSCHEDULE.GRAND += ppCct; 
+                    }
+                }
+            });
+
+            let delayCount = 0; let onSchedCount = 0;
+            let sortedPeriods = Object.keys(matrixData).sort();
+            sortedPeriods.forEach(periode => {
+                let sortedWPPs = Object.keys(matrixData[periode]).sort((a,b) => parseInt(a) - parseInt(b));
+                sortedWPPs.forEach(wpp => {
+                    let pwKey = periode + '_' + wpp; let itemIndex = globalUniquePeriodeWPP.indexOf(pwKey);
+                    if (itemIndex < delayIndex) delayCount++; else onSchedCount++;
+                });
+            });
+
+            let currentIndex = 0;
+            let pctFinalVal = totalFooters.TOTAL.GRAND > 0 ? Math.round(((totalFooters.TOTAL.GRAND - totalFooters.DELAY.GRAND) / totalFooters.TOTAL.GRAND) * 100) : 0;
+            const matrixTbody = document.getElementById('matrix-tbody'); let matrixHtml = '';
+            
+            sortedPeriods.forEach(periode => {
+                let sortedWPPs = Object.keys(matrixData[periode]).sort((a,b) => parseInt(a) - parseInt(b));
+                sortedWPPs.forEach(wpp => {
+                    let dataOK = matrixData[periode][wpp].OK; let dataSH = matrixData[periode][wpp].SH;
+                    let remarkHtml = ''; let pctHtml = '';
+                    
+                    if (currentIndex === 0) {
+                        let totalRowspan = (delayCount + onSchedCount) * 2;
+                        pctHtml = `<td rowspan="${totalRowspan}" class="text-center font-bold text-gray-800 align-middle bg-white text-xl border-l border-gray-300 shadow-sm">${pctFinalVal}%</td>`;
+                    }
+                    if (currentIndex === 0 && delayCount > 0) remarkHtml = `<td rowspan="${delayCount * 2}" class="text-center font-bold text-gray-900 align-middle bg-[#fce4d6] text-sm shadow-sm">${totalFooters.DELAY.GRAND.toLocaleString()}</td>`;
+                    else if (currentIndex === delayCount && onSchedCount > 0) remarkHtml = `<td rowspan="${onSchedCount * 2}" class="text-center font-bold text-gray-900 align-middle bg-[#bdd7ee] text-sm shadow-sm">${totalFooters.ONSCHEDULE.GRAND.toLocaleString()}</td>`;
+
+                    matrixHtml += `
+                        <tr class="row-group-start hover:bg-gray-50 transition-colors">
+                            <td rowspan="2" class="text-center text-gray-600 font-medium align-middle">${periode}</td>
+                            <td rowspan="2" class="text-center font-extrabold text-gray-800 bg-gray-100 align-middle font-mono">${wpp}</td>
+                            <td class="font-bold text-emerald-700 bg-emerald-50/50 tracking-tight">POTENSI OKE</td>
+                            <td class="text-right">${dataOK.ADD > 0 ? dataOK.ADD.toLocaleString() : ''}</td>
+                            <td class="text-right">${dataOK.CAT > 0 ? dataOK.CAT.toLocaleString() : ''}</td>
+                            <td class="text-right">${dataOK.REG > 0 ? dataOK.REG.toLocaleString() : ''}</td>
+                            <td class="text-right">${dataOK.SMC > 0 ? dataOK.SMC.toLocaleString() : ''}</td>
+                            <td class="text-right">${dataOK.SMV > 0 ? dataOK.SMV.toLocaleString() : ''}</td>
+                            <td class="text-right font-bold bg-gray-100 text-gray-800">${dataOK.RowTotal > 0 ? dataOK.RowTotal.toLocaleString() : ''}</td>
+                            ${remarkHtml} ${pctHtml}
+                        </tr>
+                        <tr class="hover:bg-red-50 transition-colors text-red-700">
+                            <td class="font-bold bg-red-50/70 tracking-tight">POTENSI SH</td>
+                            <td class="text-right">${dataSH.ADD > 0 ? dataSH.ADD.toLocaleString() : ''}</td>
+                            <td class="text-right">${dataSH.CAT > 0 ? dataSH.CAT.toLocaleString() : ''}</td>
+                            <td class="text-right">${dataSH.REG > 0 ? dataSH.REG.toLocaleString() : ''}</td>
+                            <td class="text-right">${dataSH.SMC > 0 ? dataSH.SMC.toLocaleString() : ''}</td>
+                            <td class="text-right">${dataSH.SMV > 0 ? dataSH.SMV.toLocaleString() : ''}</td>
+                            <td class="text-right font-bold bg-red-50">${dataSH.RowTotal > 0 ? dataSH.RowTotal.toLocaleString() : ''}</td>
+                        </tr>
+                    `;
+                    currentIndex++;
+                });
+            });
+            matrixTbody.innerHTML = matrixHtml;
+
+            const matrixTfoot = document.getElementById('matrix-tfoot');
+            let pctFinalAll = totalFooters.TOTAL.GRAND > 0 ? ((totalFooters.TOTAL.GRAND - totalFooters.DELAY.GRAND) / totalFooters.TOTAL.GRAND * 100).toFixed(4) : 0;
+            matrixTfoot.innerHTML = `
+                <tr class="footer-row text-gray-800 border-t-[3px] border-gray-600">
+                    <td colspan="3" class="text-right py-1">TOTAL LOADING</td>
+                    <td class="text-right">${totalFooters.TOTAL.ADD.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.CAT.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.REG.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.SMC.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.SMV.toLocaleString()}</td>
+                    <td class="text-right text-brand-700 font-extrabold text-sm">${totalFooters.TOTAL.GRAND.toLocaleString()}</td>
+                    <td class="bg-white border-none"></td><td class="bg-white border-none"></td>
+                </tr>
+                <tr class="sub-footer text-emerald-800 bg-emerald-50 font-bold">
+                    <td colspan="3" class="text-right py-1">ON SCHEDULE</td>
+                    <td class="text-right">${totalFooters.ONSCHEDULE.ADD.toLocaleString()}</td><td class="text-right">${totalFooters.ONSCHEDULE.CAT.toLocaleString()}</td><td class="text-right">${totalFooters.ONSCHEDULE.REG.toLocaleString()}</td><td class="text-right">${totalFooters.ONSCHEDULE.SMC.toLocaleString()}</td><td class="text-right">${totalFooters.ONSCHEDULE.SMV.toLocaleString()}</td><td class="text-right">${totalFooters.ONSCHEDULE.GRAND.toLocaleString()}</td>
+                    <td class="bg-white border-none"></td><td class="bg-white border-none"></td>
+                </tr>
+                <tr class="sub-footer text-red-800 bg-red-50 font-bold">
+                    <td colspan="3" class="text-right py-1">DELAY</td>
+                    <td class="text-right">${totalFooters.DELAY.ADD.toLocaleString()}</td><td class="text-right">${totalFooters.DELAY.CAT.toLocaleString()}</td><td class="text-right">${totalFooters.DELAY.REG.toLocaleString()}</td><td class="text-right">${totalFooters.DELAY.SMC.toLocaleString()}</td><td class="text-right">${totalFooters.DELAY.SMV.toLocaleString()}</td><td class="text-right">${totalFooters.DELAY.GRAND.toLocaleString()}</td>
+                    <td class="bg-white border-none"></td><td class="bg-white border-none"></td>
+                </tr>
+                <tr class="sub-footer text-brand-900 bg-brand-100 font-bold">
+                    <td colspan="8" class="text-right tracking-tight py-1">%-TAGE BASED ON PROGRESS</td>
+                    <td class="text-right font-extrabold text-sm bg-brand-200">${pctFinalAll}%</td>
+                    <td class="bg-white border-none"></td><td class="bg-white border-none"></td>
+                </tr>
+            `;
+        }
+
+        // ==========================================
+        // 7. DATABASE BERSIH (MASTER DATA TAMPILAN)
+        // ==========================================
+        const targetColumnsDB = ['STATUS', 'CUSTOMER', 'ASSY', 'CCT', 'QTY', 'TOTAL CCT', 'WP', 'PERIODE', 'LINE', 'COLOR WOS', 'STWC'];
+        const dropdownColumns = ['STATUS', 'CUSTOMER', 'PERIODE', 'WP', 'LINE', 'COLOR WOS'];
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.filter-dropdown-container')) {
+                document.querySelectorAll('.filter-dropdown-menu').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        function toggleFilterDropdown(colIdx) {
+            const drop = document.getElementById('filter-drop-' + colIdx);
+            const isHidden = drop.classList.contains('hidden');
+            document.querySelectorAll('.filter-dropdown-menu').forEach(el => el.classList.add('hidden'));
+            if(isHidden) drop.classList.remove('hidden');
+        }
+
+        function searchFilter(input, colIdx) {
+            let filter = input.value.toLowerCase();
+            let labels = document.getElementById('filter-list-' + colIdx).querySelectorAll('label');
+            labels.forEach(label => {
+                let text = label.innerText.toLowerCase();
+                label.style.display = text.includes(filter) ? '' : 'none';
+            });
+        }
+
+        function toggleAllCheckboxes(masterCb, colIdx) {
+            let isChecked = masterCb.checked;
+            document.querySelectorAll(`.filter-checkbox[data-col-idx="${colIdx}"]`).forEach(cb => {
+                if(cb.parentElement.style.display !== 'none') cb.checked = isChecked;
+            });
+            updateCheckboxFilters(colIdx);
+        }
+
+        function updateCheckboxFilters(colIdx) {
+            let colName = '';
+            let checkedValues = [];
+            let allChecked = true;
+            document.querySelectorAll(`.filter-checkbox[data-col-idx="${colIdx}"]`).forEach(cb => {
+                colName = cb.getAttribute('data-col');
+                if(cb.checked) checkedValues.push(cb.value.toLowerCase());
+                else allChecked = false;
+            });
+            let masterCb = document.querySelector(`.select-all-cb[data-col-idx="${colIdx}"]`);
+            if(masterCb) masterCb.checked = allChecked;
+
+            if(colName) {
+                if(allChecked) delete controlFilters[colName]; 
+                else controlFilters[colName] = checkedValues;
+                renderControlOutstanding();
+            }
+        }
+
+        function getUniqueValues(colName) {
+            let values = new Set();
+            if (colName === 'STATUS') {
+                globalMasterData.forEach(row => { if (row._status) values.add(row._status); });
+            } else {
+                globalMasterData.forEach(row => {
+                    if (row[colName] !== undefined && row[colName] !== null) values.add(String(row[colName]).trim());
+                });
+            }
+            return Array.from(values).sort();
+        }
+
+        function renderControlPeriodeTabs() {
+            const container = document.getElementById('control-periode-tabs');
+            if(!container) return;
+            
+            let periodes = new Set();
+            globalMasterData.forEach(m => {
+                let p = String(m['PERIODE'] || '').trim();
+                if(p && p !== '-') periodes.add(p);
+            });
+            let sortedPeriodes = Array.from(periodes).sort();
+            
+            let html = `<button onclick="setActivePeriodeTab('ALL')" class="px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border shadow-sm ${activePeriodeTab === 'ALL' ? 'bg-brand-500 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}">SEMUA PERIODE</button>`;
+            
+            sortedPeriodes.forEach(p => {
+                html += `<button onclick="setActivePeriodeTab('${p}')" class="px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border shadow-sm ${activePeriodeTab === p ? 'bg-brand-500 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}">${p}</button>`;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function setActivePeriodeTab(p) {
+            activePeriodeTab = p;
+            renderControlPeriodeTabs();
+            renderControlOutstanding();
+        }
+
+        function setupControlHeaders() {
+            renderControlPeriodeTabs();
+            
+            const thead = document.getElementById('control-thead');
+            
+            let displayHeaders = targetColumnsDB.filter(col => {
+                return masterHeaders.includes(col) || col === 'STATUS';
+            });
+            if (displayHeaders.length < 3) displayHeaders = targetColumnsDB; 
+
+            let headerHtml = `<tr>`;
+            
+            displayHeaders.forEach((col, colIdx) => {
+                headerHtml += `<th class="px-2 py-1.5 border-r border-gray-200 bg-gray-50 font-bold text-[9px] tracking-wider uppercase text-left align-top">
+                                <div class="flex flex-col gap-1 h-full filter-dropdown-container relative">
+                                    <span>${col}</span>`;
+                
+                if (dropdownColumns.includes(col)) {
+                    let uniqueVals = getUniqueValues(col);
+                    let optionsHtml = ``;
+                    uniqueVals.forEach(val => {
+                        let safeVal = val.replace(/"/g, '&quot;');
+                        optionsHtml += `<label class="flex items-center gap-1.5 px-1.5 py-1 hover:bg-gray-100 cursor-pointer text-gray-700 whitespace-normal break-all">
+                                            <input type="checkbox" class="form-checkbox h-2.5 w-2.5 text-brand-600 rounded-sm border-gray-300 filter-checkbox" data-col="${col}" data-col-idx="${colIdx}" value="${safeVal}" checked>
+                                            <span class="text-[9px] font-medium truncate">${val || '(Kosong)'}</span>
+                                        </label>`;
+                    });
+                    
+                    headerHtml += `
+                        <div class="relative w-full mt-auto">
+                            <button onclick="toggleFilterDropdown('${colIdx}')" class="w-full text-left text-gray-800 px-1.5 py-0.5 rounded border border-gray-300 focus:outline-none focus:border-brand-500 font-normal text-[9px] bg-white flex justify-between items-center shadow-sm">
+                                <span class="truncate text-gray-400">Filter...</span> <i data-lucide="chevron-down" class="w-2.5 h-2.5 shrink-0"></i>
+                            </button>
+                            <div id="filter-drop-${colIdx}" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-200 shadow-xl z-50 w-40 max-h-48 overflow-y-auto rounded-md py-1 filter-dropdown-menu font-normal">
+                                <div class="px-1.5 py-1 border-b border-gray-100 sticky top-0 bg-white z-10">
+                                    <input type="text" placeholder="Cari..." class="w-full text-[9px] p-1 border rounded outline-none focus:border-brand-500" oninput="searchFilter(this, '${colIdx}')">
+                                </div>
+                                <div class="px-1.5 py-1 border-b border-gray-100">
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-gray-800 font-bold">
+                                        <input type="checkbox" class="form-checkbox h-2.5 w-2.5 select-all-cb" data-col="${col}" data-col-idx="${colIdx}" checked onchange="toggleAllCheckboxes(this, '${colIdx}')">
+                                        <span class="text-[9px]">Pilih Semua</span>
+                                    </label>
+                                </div>
+                                <div id="filter-list-${colIdx}">${optionsHtml}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    headerHtml += `<input type="text" placeholder="Ketik..." class="w-full text-gray-800 px-1.5 py-0.5 rounded border border-gray-300 focus:outline-none focus:border-brand-500 font-normal text-[9px] bg-white filter-input mt-auto" data-col="${col}"/>`;
+                }
+                headerHtml += `</div></th>`;
+            });
+            headerHtml += `</tr>`;
+            thead.innerHTML = headerHtml;
+
+            // Pastikan filter reset ke default (Show All) saat diload pertama kali
+            controlFilters = {};
+            document.querySelectorAll('.filter-checkbox').forEach(cb => cb.addEventListener('change', (e) => updateCheckboxFilters(e.target.getAttribute('data-col-idx'))));
+            document.querySelectorAll('.filter-input').forEach(input => input.addEventListener('input', (e) => { controlFilters[e.target.getAttribute('data-col')] = e.target.value.toLowerCase(); renderControlOutstanding(); }));
+            
+            // JANGAN lakukan simulasi updateCheckboxFilters di sini karena akan membuat data tersembunyi
+            // Cukup panggil render
+            renderControlOutstanding();
+        }
+
+        function renderControlOutstanding() {
+            const tbody = document.getElementById('control-tbody');
+            
+            let displayHeaders = targetColumnsDB.filter(col => {
+                return masterHeaders.includes(col) || col === 'STATUS';
+            });
+            if (displayHeaders.length < 3) displayHeaders = targetColumnsDB; 
+
+            let filteredData = globalMasterData.filter(row => {
+                // Filter Tab Periode
+                if (activePeriodeTab !== 'ALL') {
+                    let rPer = String(row['PERIODE'] || '').trim();
+                    if (rPer !== activePeriodeTab) return false;
+                }
+
+                // Filter Kolom Mutlak
+                return displayHeaders.every(col => {
+                    let filterVal = controlFilters[col];
+                    if (filterVal === undefined || filterVal === '') return true; 
+                    
+                    let cellValue = '';
+                    if (col === 'STATUS') {
+                        cellValue = row._status ? String(row._status).toLowerCase().trim() : '';
+                    } else {
+                        cellValue = row[col] !== undefined ? String(row[col]).toLowerCase().trim() : '';
+                    }
+                    
+                    if (dropdownColumns.includes(col)) {
+                        if (Array.isArray(filterVal)) { 
+                            if (filterVal.length === 0) return false; 
+                            return filterVal.includes(cellValue); 
+                        }
+                        return cellValue === filterVal;
+                    } else { 
+                        return cellValue.includes(filterVal); 
+                    }
+                });
+            });
+
+            // Auto-sort berdasarkan STWC (Terlama ke Terbaru)
+            filteredData.sort((a, b) => {
+                let tA = parseIndoDate(a['STWC']);
+                let tB = parseIndoDate(b['STWC']);
+                if (tA === 0) tA = 9999999999999; 
+                if (tB === 0) tB = 9999999999999;
+                return tA - tB;
+            });
+
+            let displayLimit = 300; let htmlString = "";
+            filteredData.slice(0, displayLimit).forEach((row, idx) => {
+                let rowColor = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
+                
+                let bgClass = ''; let badge = '';
+                if(row._status === 'CLOSED') { bgClass = 'bg-emerald-50'; badge = `<span class="bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">CLOSED PP</span>`; }
+                else if(row._status === 'CND 3') { bgClass = 'bg-red-50'; badge = `<span class="bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded animate-pulse shadow-sm">CND 3</span>`; }
+                else if(row._status === 'CND 2') { bgClass = 'bg-amber-50'; badge = `<span class="bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded shadow-sm">CND 2</span>`; }
+                else { badge = `<span class="bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded shadow-sm">OPEN</span>`; }
+
+                htmlString += `<tr class="hover:bg-gray-200 ${bgClass} transition-colors border-b border-gray-100">`;
+                htmlString += `<td class="px-2 py-1 border-r border-gray-200 text-center align-middle">${badge}</td>`;
+                
+                displayHeaders.forEach(col => {
+                    if (col === 'STATUS') return;
+                    let cellData = row[col] !== undefined ? row[col] : '';
+                    let colDateClass = isDateColumn(col) ? "font-mono font-bold" : "";
+                    htmlString += `<td class="px-2 py-1 border-r border-gray-100 max-w-[200px] truncate align-middle ${colDateClass}">${cellData}</td>`;
+                });
+                htmlString += `</tr>`;
+            });
+
+            tbody.innerHTML = htmlString;
+            safeSetText('control-counter', filteredData.length > displayLimit ? `Preview ${displayLimit}/${filteredData.length} Baris` : `Total ${filteredData.length} Baris`);
+        }
+
+        // ==========================================
+        // 8. SH MATERIAL LOGIC
+        // ==========================================
+        let isShFormOpen = false;
+        function toggleShForm() {
+            let formContainer = document.getElementById('sh-form-container');
+            if (isShFormOpen) { formContainer.classList.add('hidden'); } else { formContainer.classList.remove('hidden'); }
+            isShFormOpen = !isShFormOpen;
+        }
+
+        document.getElementById('sh-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            let newSh = {
+                partName: document.getElementById('sh-part').value, type: document.getElementById('sh-type').value,
+                mpp: document.getElementById('sh-mpp').value, wp: document.getElementById('sh-wp').value.toUpperCase(),
+                tanggalSH: document.getElementById('sh-date').value, id: Date.now()
+            };
+            globalShMaterials.push(newSh);
+            saveDB('sh_materials', globalShMaterials);
+            renderShMaterials(); toggleShForm(); this.reset();
+            if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
+        });
+
+        function confirmArrival(id) {
+            let dateStr = prompt("Tanggal Part Aktual Datang (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+            if(dateStr) {
+                let item = globalShMaterials.find(x => x.id === id);
+                if(item) { item.tanggalKedatangan = dateStr; saveDB('sh_materials', globalShMaterials); renderShMaterials(); renderReportWIP(); }
+            }
+        }
+
+        function renderShMaterials() {
+            const container = document.getElementById('sh-cards-container');
+            if(globalShMaterials.length === 0) { container.innerHTML = `<div class="text-gray-400 text-center col-span-full mt-4">Belum ada data SH Material.</div>`; return; }
+            let html = '';
+            globalShMaterials.forEach(sh => {
+                let isDatang = sh.tanggalKedatangan !== null;
+                let bgStyle = isDatang ? 'bg-white border-green-200' : 'bg-white border-red-200';
+                let actionBtn = isDatang ? `<span class="text-[9px] font-bold text-green-600 flex items-center justify-center gap-1 bg-green-50 py-1 rounded border border-green-100"><i data-lucide="check-circle" class="w-2.5 h-2.5"></i> Arrived: ${sh.tanggalKedatangan}</span>` : `<button onclick="confirmArrival(${sh.id})" class="w-full text-[9px] font-bold bg-gray-800 text-white py-1 rounded hover:bg-gray-900 transition flex items-center justify-center gap-1"><i data-lucide="truck" class="w-2.5 h-2.5"></i> Konfirmasi Kedatangan</button>`;
+
+                html += `
+                    <div class="bento-box p-2 flex flex-col ${bgStyle} relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1 ${isDatang ? 'bg-green-500' : 'bg-red-500'}"></div>
+                        <div class="flex justify-between items-start mb-1 mt-1">
+                            <div><h4 class="font-bold text-gray-800 text-[10px] leading-tight">${sh.partName}</h4><span class="text-[8px] font-semibold text-gray-500">${sh.type}</span></div>
+                            <span class="px-1 py-0.5 rounded bg-gray-100 border border-gray-200 text-[8px] font-mono font-bold text-gray-800">${sh.wp}</span>
+                        </div>
+                        <div class="bg-gray-50 rounded p-1.5 mb-2 text-[9px] space-y-0.5 flex-1 border border-gray-100">
+                            <div class="flex justify-between"><span class="text-gray-500 font-medium">MPP</span><span class="font-bold text-gray-800">${sh.mpp}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500 font-medium">Tgl ID</span><span class="font-bold text-red-600">${sh.tanggalSH}</span></div>
+                        </div>
+                        <div class="mt-auto">${actionBtn}</div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+            lucide.createIcons();
+        }
+
+    </script>
+</body>
+</html>

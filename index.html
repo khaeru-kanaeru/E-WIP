@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Monitoring WIP & Master Validation</title>
+    <title>Sistem Monitoring WIP & Master Validation (Cloud Version)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -21,8 +21,9 @@
     <!-- HTML2Canvas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+    <!-- FIREBASE SDK (Compat Version for Easy Integration) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <script>
         tailwind.config = {
@@ -70,6 +71,12 @@
         .toast.success { background-color: #10b981; }
         .toast.error { background-color: #ef4444; }
         .toast.warning { background-color: #f59e0b; }
+
+        /* Drag & Drop Fixes */
+        .drop-zone { position: relative; border: 2px dashed #cbd5e1; border-radius: 1rem; padding: 2.5rem; text-align: center; transition: all 0.2s ease; cursor: pointer; background-color: #f8fafc; }
+        .drop-zone * { pointer-events: none; }
+        .drop-zone.drag-active { border-color: #6366f1 !important; background-color: #e0e7ff !important; }
+        #drop-zone-wip.drag-active { border-color: #14b8a6 !important; background-color: #ccfbf1 !important; }
     </style>
 </head>
 <body class="flex flex-col h-screen overflow-hidden font-sans text-sm relative">
@@ -79,14 +86,14 @@
     <!-- Loading Screen Overlay -->
     <div id="loading-overlay" class="fixed inset-0 bg-gray-900/80 z-50 flex flex-col items-center justify-center">
         <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
-            <div class="animate-bounce mb-4"><i data-lucide="database" class="w-12 h-12 text-brand-500 mx-auto"></i></div>
-            <h3 class="text-lg font-bold text-gray-800 mb-1" id="loading-title">Inisialisasi Sistem...</h3>
-            <p class="text-xs text-gray-500 mb-6" id="loading-desc">Membaca IndexedDB Browser.</p>
+            <div class="animate-bounce mb-4"><i data-lucide="cloud" class="w-12 h-12 text-brand-500 mx-auto"></i></div>
+            <h3 class="text-lg font-bold text-gray-800 mb-1" id="loading-title">Menghubungkan ke Cloud...</h3>
+            <p class="text-xs text-gray-500 mb-6" id="loading-desc">Membaca data dari server Firebase.</p>
             <div class="w-full bg-gray-100 rounded-full h-3 mb-2 overflow-hidden border border-gray-200">
                 <div id="loading-bar" class="bg-brand-500 h-3 rounded-full progress-bar-fill w-0"></div>
             </div>
             <div class="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                <span id="loading-pct">0%</span><span id="loading-rows">Menghubungkan...</span>
+                <span id="loading-pct">0%</span><span id="loading-rows">Menyinkronkan...</span>
             </div>
         </div>
     </div>
@@ -115,14 +122,14 @@
         </div>
     </div>
 
-    <!-- Navbar Restructured -->
+    <!-- Navbar -->
     <nav class="bg-white border-b border-bento-border px-4 py-2 flex items-center justify-between z-20 shrink-0 shadow-sm">
         <div class="flex items-center gap-4">
             <div class="flex items-center gap-2 mr-2">
-                <div class="bg-brand-500 text-white p-1.5 rounded-lg shadow-sm"><i data-lucide="bar-chart-3" class="w-4 h-4"></i></div>
+                <div class="bg-brand-500 text-white p-1.5 rounded-lg shadow-sm"><i data-lucide="cloud" class="w-4 h-4"></i></div>
                 <div>
                     <h1 class="font-bold text-gray-800 text-sm leading-none tracking-tight">Executive WIP</h1>
-                    <span class="text-[9px] text-brand-600 font-bold uppercase tracking-wider">Cross-Validation</span>
+                    <span class="text-[9px] text-brand-600 font-bold uppercase tracking-wider">Cloud Synchronized</span>
                 </div>
             </div>
         </div>
@@ -149,7 +156,7 @@
         </div>
     </nav>
 
-    <!-- Set Outstanding (Global Control for ALL tabs) -->
+    <!-- Global Threshold Control -->
     <div class="bg-amber-50 border-b border-amber-200 px-4 py-2 flex flex-col md:flex-row justify-between items-center shrink-0 shadow-sm hidden gap-2" id="global-threshold-bar">
         <div class="flex items-center gap-2">
             <i data-lucide="target" class="w-4 h-4 text-amber-600"></i>
@@ -167,6 +174,7 @@
         </div>
     </div>
 
+    <!-- MAIN SCROLL AREA -->
     <main class="flex-1 overflow-auto p-3 flex flex-col gap-4 bg-gray-100/50" id="main-scroll-area">
         
         <!-- ================= OVERVIEW VIEW (DASHBOARD) ================= -->
@@ -174,18 +182,16 @@
             <!-- OVERVIEW EXPORT WRAPPER -->
             <div id="view-overview-export-wrapper" class="w-full flex flex-col gap-4 bg-gray-100/50 p-2 rounded-xl">
                 
-                <!-- Category Overview Context Filters -->
+                <!-- Category Context Filters -->
                 <div class="flex flex-col sm:flex-row justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-200 shrink-0 gap-3" data-html2canvas-ignore id="overview-export-buttons-hide">
                     <div class="flex gap-3 items-center w-full overflow-x-auto scrollbar-hide">
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1"><i data-lucide="filter" class="w-3 h-3"></i> TAMPILAN KATEGORI:</span>
-                        <div class="flex gap-1.5 bg-gray-100 p-1 rounded-lg" id="overview-cat-buttons">
-                            <!-- Injected by JS -->
-                        </div>
+                        <div class="flex gap-1.5 bg-gray-100 p-1 rounded-lg" id="overview-cat-buttons"></div>
                     </div>
                     <button onclick="downloadOverviewImage()" class="shrink-0 flex items-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-md text-[10px] font-bold shadow transition"><i data-lucide="camera" class="w-3.5 h-3.5"></i> Export Dashboard</button>
                 </div>
 
-                <!-- MASTER DATA ANALYTICS ROW -->
+                <!-- KPI CARDS -->
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3 shrink-0">
                     <div class="bento-box p-4 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white relative overflow-hidden shadow-lg border-none">
                         <i data-lucide="layers" class="w-20 h-20 absolute -right-4 -bottom-4 opacity-20"></i>
@@ -227,8 +233,9 @@
                     </div>
                 </div>
 
+                <!-- LISTS & TREND LINE -->
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 shrink-0">
-                    <!-- Left 1: Overdue List -->
+                    <!-- Overdue List -->
                     <div class="bento-box bg-white flex flex-col h-[320px] overflow-hidden">
                         <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 shrink-0 bg-red-50/30">
                             <div class="flex items-center justify-between">
@@ -240,7 +247,7 @@
                         <div id="overview-overdue-list" class="flex-1 overflow-auto flex flex-col gap-1.5 p-3"></div>
                     </div>
 
-                    <!-- Left 2: Daily Closed Log -->
+                    <!-- Closed List -->
                     <div class="bento-box bg-white flex flex-col h-[320px] overflow-hidden border-t-4 border-t-emerald-400">
                         <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 shrink-0 bg-emerald-50/30">
                             <div class="flex items-center justify-between">
@@ -252,7 +259,7 @@
                         <div id="overview-closed-list" class="flex-1 overflow-auto flex flex-col gap-1.5 p-3"></div>
                     </div>
 
-                    <!-- Right: Daily Data Trend (Health) -->
+                    <!-- Health Trend -->
                     <div class="bento-box p-5 bg-white flex flex-col h-[320px] lg:col-span-2 border-t-4 border-t-blue-400 shadow-sm">
                         <div class="mb-3 shrink-0 flex justify-between items-start">
                             <div>
@@ -265,16 +272,15 @@
                     </div>
                 </div>
 
-                <!-- Loading Trends - BESAR & DITONJOLKAN -->
+                <!-- LOADING ANALYSIS HEADER -->
                 <div class="bento-box p-5 bg-white flex flex-col w-full mt-2 shadow-sm">
                     <div class="flex justify-between items-center w-full mb-3 shrink-0 border-b border-gray-100 pb-3">
                         <div>
                             <h2 class="font-bold text-gray-800 text-lg flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5 text-brand-500"></i> Analisis Loading & Outstanding</h2>
-                            <p class="text-[11px] text-gray-500 mt-1">Area dengan latar belakang merah transparan menunjukkan batas Outstanding (Delay).</p>
+                            <p class="text-[11px] text-gray-500 mt-1">Area dengan latar belakang merah muda transparan menunjukkan batas Outstanding (Delay).</p>
                         </div>
                     </div>
 
-                    <!-- HIGHLIGHT KPI RAKSASA -->
                     <div class="flex flex-wrap lg:flex-nowrap gap-4 mb-5 shrink-0">
                         <div class="flex-1 flex flex-col bg-gray-50 border border-gray-200 px-5 py-3 rounded-xl shadow-sm">
                             <span class="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Total Load Aktif</span>
@@ -295,7 +301,7 @@
                     </div>
                 </div>
 
-                <!-- DYNAMIC CHARTS CONTAINER (Grand Total & Categories will be injected here) -->
+                <!-- DYNAMIC CHARTS CONTAINER -->
                 <div id="overview-charts-container" class="flex flex-col gap-5 shrink-0">
                     <!-- JS Injected: Big Chart Sections -->
                 </div>
@@ -303,25 +309,25 @@
         </section>
 
         <!-- ================= MASTER DATA INPUT (UPLOAD) VIEW ================= -->
-        <section id="view-master" class="hidden h-full flex flex-col items-center justify-center">
-            <div class="bento-box max-w-xl w-full p-8 text-center relative overflow-hidden shadow-xl">
+        <section id="view-master" class="hidden h-full flex flex-col items-center justify-start py-10 overflow-auto">
+            <div class="bento-box max-w-2xl w-full p-8 text-center relative overflow-hidden shadow-xl shrink-0">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-indigo-500"></div>
                 <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-indigo-100">
                     <i data-lucide="library" class="text-indigo-600 w-8 h-8"></i>
                 </div>
                 <h2 class="text-2xl font-black text-gray-800 mb-2 tracking-tight">Database Master (MPP)</h2>
-                <p class="text-gray-500 text-xs mb-8 leading-relaxed px-4">Sistem mengekstrak <strong class="text-indigo-600">Seluruh Sheet</strong> secara otomatis.<br/>Sistem mengabaikan Line <strong>Proto/PT</strong> dan menstandarkan format STWC.</p>
+                <p class="text-gray-500 text-xs mb-8 leading-relaxed px-4">Sistem mengekstrak <strong class="text-indigo-600">Seluruh Sheet</strong> secara otomatis.<br/>Anda bisa melempar beberapa file sekaligus (Multi-Upload).</p>
                 
-                <div id="drop-zone-master" class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/50 bg-gray-50/50 rounded-2xl p-10 transition-all cursor-pointer group mb-6">
-                    <input type="file" id="file-input-master" class="hidden" accept=".xlsx, .xls, .csv">
-                    <div class="bg-white w-14 h-14 rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform border border-gray-100">
+                <div id="drop-zone-master" class="drop-zone group mb-4">
+                    <input type="file" id="file-input-master" class="hidden" accept=".xlsx, .xls, .csv" multiple>
+                    <div class="bg-white w-14 h-14 rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform border border-gray-100 pointer-events-none">
                         <i data-lucide="upload-cloud" class="text-gray-400 group-hover:text-indigo-500 w-6 h-6 transition-colors"></i>
                     </div>
-                    <h3 class="text-sm font-bold text-gray-700 group-hover:text-indigo-700 transition">Upload File MPP All Line</h3>
-                    <p class="text-[10px] text-gray-400 mt-1">Seret & lepas file Excel di sini</p>
+                    <h3 class="text-sm font-bold text-gray-700 group-hover:text-indigo-700 transition pointer-events-none">Upload File MPP All Line</h3>
+                    <p class="text-[10px] text-gray-400 mt-1 pointer-events-none">Seret & lepas 1 atau banyak file Excel di sini</p>
                 </div>
-                
-                <div class="flex items-center justify-between bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-[11px]">
+
+                <div class="flex items-center justify-between bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-[11px] mb-4">
                     <div class="flex flex-col text-left">
                         <span class="text-gray-500 font-medium">Total Master Terdaftar</span> 
                         <strong id="info-master-count" class="text-indigo-800 text-lg font-black leading-none mt-1">0 <span class="text-xs font-bold">Assy</span></strong>
@@ -330,36 +336,48 @@
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Kosongkan
                     </button>
                 </div>
+                
+                <!-- LIST FILE MASTER UPLOADED -->
+                <div class="text-left mt-2 border-t border-gray-100 pt-4">
+                    <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><i data-lucide="folder-open" class="w-3.5 h-3.5"></i> File Tergabung saat ini:</h4>
+                    <div id="master-file-list" class="flex flex-col gap-2 max-h-40 overflow-y-auto pr-2 scrollbar-hide"></div>
+                </div>
             </div>
         </section>
 
         <!-- ================= DATABASE INPUT (DAILY WIP) VIEW ================= -->
-        <section id="view-input" class="hidden h-full flex flex-col items-center justify-center">
-            <div class="bento-box max-w-xl w-full p-8 text-center relative overflow-hidden shadow-xl">
+        <section id="view-input" class="hidden h-full flex flex-col items-center justify-start py-10 overflow-auto">
+            <div class="bento-box max-w-2xl w-full p-8 text-center relative overflow-hidden shadow-xl shrink-0">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-brand-500"></div>
                 <div class="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-brand-100">
                     <i data-lucide="database" class="text-brand-600 w-8 h-8"></i>
                 </div>
                 <h2 class="text-2xl font-black text-gray-800 mb-2 tracking-tight">Validasi WIP Harian</h2>
-                <p class="text-gray-500 text-xs mb-8 leading-relaxed px-4">Upload <strong>Report WIP</strong> terbaru untuk sinkronisasi harian.<br/>Assy yang hilang atau PP kosong/strip otomatis menjadi <strong class="text-brand-600">Closed</strong>.</p>
+                <p class="text-gray-500 text-xs mb-8 leading-relaxed px-4">Upload <strong>Report WIP</strong> terbaru untuk sinkronisasi harian.<br/>Anda bisa menggabungkan beberapa file (misal: WIP Line A + WIP Line B).</p>
                 
-                <div id="drop-zone-wip" class="border-2 border-dashed border-brand-200 hover:border-brand-400 hover:bg-brand-50/50 bg-gray-50/50 rounded-2xl p-10 transition-all cursor-pointer group mb-6">
-                    <input type="file" id="file-input-wip" class="hidden" accept=".xlsx, .xls, .csv">
-                    <div class="bg-white w-14 h-14 rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform border border-gray-100">
+                <div id="drop-zone-wip" class="drop-zone group mb-4">
+                    <input type="file" id="file-input-wip" class="hidden" accept=".xlsx, .xls, .csv" multiple>
+                    <div class="bg-white w-14 h-14 rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform border border-gray-100 pointer-events-none">
                         <i data-lucide="upload-cloud" class="text-gray-400 group-hover:text-brand-500 w-6 h-6 transition-colors"></i>
                     </div>
-                    <h3 class="text-sm font-bold text-gray-700 group-hover:text-brand-700 transition">Upload Report WIP</h3>
-                    <p class="text-[10px] text-gray-400 mt-1">Data hari ini akan menimpa (replace) jika diupload ulang</p>
+                    <h3 class="text-sm font-bold text-gray-700 group-hover:text-brand-700 transition pointer-events-none">Upload Report WIP</h3>
+                    <p class="text-[10px] text-gray-400 mt-1 pointer-events-none">Data dengan nama file yang sama akan ditimpa (Replace)</p>
                 </div>
 
-                <div class="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-200 text-[11px]">
+                <div class="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-200 text-[11px] mb-4">
                     <div class="flex flex-col text-left">
                         <span class="text-gray-500 font-medium">Validasi Terakhir</span> 
                         <strong id="info-last-sync" class="text-gray-800 text-sm font-black mt-1">-</strong>
                     </div>
                     <button onclick="resetWipData()" class="px-4 py-2 bg-white hover:bg-red-50 text-red-600 font-bold rounded-lg border border-red-100 shadow-sm flex items-center gap-1.5 transition">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus WIP
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Kosongkan WIP
                     </button>
+                </div>
+
+                <!-- LIST FILE WIP UPLOADED -->
+                <div class="text-left mt-2 border-t border-gray-100 pt-4">
+                    <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><i data-lucide="folder-open" class="w-3.5 h-3.5"></i> File WIP Hari Ini:</h4>
+                    <div id="wip-file-list" class="flex flex-col gap-2 max-h-40 overflow-y-auto pr-2 scrollbar-hide"></div>
                 </div>
             </div>
         </section>
@@ -374,8 +392,6 @@
                         </div>
                         <div id="control-counter" class="text-[10px] font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-100 shadow-sm"></div>
                     </div>
-                    
-                    <!-- Tabs Periode Database Bersih -->
                     <div id="control-periode-tabs" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide"></div>
                 </div>
                 
@@ -455,67 +471,128 @@
 
     <script>
         // ==========================================
-        // 1. FIREBASE DATABASE LOGIC & REALTIME SYNC
+        // 1. FIREBASE WRAPPER LOGIC DENGAN CHUNKING (ATOMIC WRITE & THROTTLED)
         // ==========================================
+        
+        // KONFIGURASI FIREBASE ANDA
         const firebaseConfig = {
-  apiKey: "AIzaSyDpxgbqlgCbYLKGiKmqw44DMRory_iMFBo",
-  authDomain: "e-wip-7ea42.firebaseapp.com",
-  databaseURL: "https://e-wip-7ea42-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "e-wip-7ea42",
-  storageBucket: "e-wip-7ea42.firebasestorage.app",
-  messagingSenderId: "202301603639",
-  appId: "1:202301603639:web:24c0ee15102abe3080a4b2"
-};
+            apiKey: "AIzaSyDpxgbqlgCbYLKGiKmqw44DMRory_iMFBo",
+            authDomain: "e-wip-7ea42.firebaseapp.com",
+            databaseURL: "https://e-wip-7ea42-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "e-wip-7ea42",
+            storageBucket: "e-wip-7ea42.firebasestorage.app",
+            messagingSenderId: "202301603639",
+            appId: "1:202301603639:web:24c0ee15102abe3080a4b2"
+        };
 
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        let isFirebaseActive = false;
+        let db = null;
+        
+        if(firebaseConfig.apiKey && firebaseConfig.apiKey !== "MASUKKAN_API_KEY_ANDA_DI_SINI") {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            db.settings({ experimentalForceLongPolling: true });
+            isFirebaseActive = true;
+        }
 
-        // Menyimpan data ke Firebase secara Asynchronous
         async function saveDB(key, data) {
-            try { await database.ref('wip_app_state/' + key).set(data); } 
-            catch(e) { console.error("Firebase Save Error:", e); }
-        }
+            if (!isFirebaseActive) return;
+            try { 
+                const serializedData = JSON.stringify(data); 
+                const chunkSize = 400000; 
+                const chunksCount = Math.ceil(serializedData.length / chunkSize);
+                const runId = Date.now().toString(); // Versi unik untuk setiap pengiriman
 
-        // Memuat data dari Firebase (Saat awal buka web)
-        async function loadDB(key) {
-            try {
-                const snapshot = await database.ref('wip_app_state/' + key).once('value');
-                return snapshot.val();
-            } catch(e) { return null; }
-        }
+                // Ambil data versi lama untuk dihapus nanti agar database tidak penuh
+                let oldRunId = null;
+                let oldChunksCount = 0;
+                try {
+                    const oldMeta = await db.collection("wip_dashboard").doc(key + "_meta").get();
+                    if(oldMeta.exists) {
+                        oldRunId = oldMeta.data().runId;
+                        oldChunksCount = oldMeta.data().chunks;
+                    }
+                } catch(e) {}
 
-        // Listener Real-time: Merender ulang layar otomatis jika ada komputer lain yang upload
-        function setupRealtimeSync() {
-            database.ref('wip_app_state').on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    globalMasterData = data.master_data || [];
-                    globalWipData = data.wip_data || [];
-                    globalShMaterials = data.sh_materials || [];
-                    dailyHistory = data.daily_history || [];
-                    globalCutoffPWKey = data.global_cutoff_key || null;
-                    globalDelayPWKey = data.global_delay_key || null;
-                    masterHeaders = data.master_headers || [];
+                // Tulis data baru ke dokumen yang unik (Atomic Write)
+                for (let i = 0; i < chunksCount; i++) {
+                    let chunkStr = serializedData.substring(i * chunkSize, (i + 1) * chunkSize);
+                    let retriesChunk = 3;
+                    while(retriesChunk > 0) {
+                        try {
+                            await db.collection("wip_dashboard").doc(`${key}_${runId}_${i}`).set({ payload: chunkStr });
+                            break;
+                        } catch(e) {
+                            retriesChunk--;
+                            if(retriesChunk === 0) throw e;
+                            console.warn("Mencoba ulang pengiriman pecahan data ke-" + i);
+                            await new Promise(r => setTimeout(r, 1500));
+                        }
+                    }
+                    // Beri napas ke jaringan Firebase Anda
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                }
 
-                    if (globalMasterData.length > 0) {
-                        updateWipDependencies();
-                        updateInputStats();
-                        updateGlobalThresholdUI();
-                        
-                        // Render ulang HANYA pada tab yang sedang dibuka (tidak mengganggu user)
-                        if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
-                        if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
-                        if(!document.getElementById('view-control').classList.contains('hidden')) { renderControlPeriodeTabs(); renderControlOutstanding(); }
-                        if(!document.getElementById('view-sh').classList.contains('hidden')) renderShMaterials();
-                        
-                        safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
-                    } else {
-                        // Jika database kosong (misal Factory Reset dari komputer lain)
-                        safeSetText('info-master-count', '0 Assy');
-                        safeSetText('info-last-sync', '-');
+                // Sahkan data baru di META (Memberitahu sistem bahwa data baru sudah lengkap 100%)
+                let retriesMeta = 3;
+                while(retriesMeta > 0) {
+                    try {
+                        await db.collection("wip_dashboard").doc(key + "_meta").set({ chunks: chunksCount, runId: runId });
+                        break;
+                    } catch(e) {
+                        retriesMeta--;
+                        if(retriesMeta === 0) throw e;
+                        await new Promise(r => setTimeout(r, 1000));
                     }
                 }
-            });
+
+                // Bersihkan sampah data versi lama (Non-blocking)
+                if (oldChunksCount > 0) {
+                    for(let i = 0; i < oldChunksCount; i++){
+                        const oldDocId = oldRunId ? `${key}_${oldRunId}_${i}` : `${key}_${i}`;
+                        db.collection("wip_dashboard").doc(oldDocId).delete().catch(()=>{});
+                    }
+                }
+                
+            } catch(e) { 
+                console.error("Firebase Save Error:", e); 
+                showToast("Server Cloud menolak data (Koneksi Penuh). Coba beberapa saat lagi.", "error"); 
+                throw e; 
+            }
+        }
+
+        async function loadDB(key) {
+            if (!isFirebaseActive) return null;
+            try { 
+                const metaSnap = await db.collection("wip_dashboard").doc(key + "_meta").get();
+                if (!metaSnap.exists) {
+                    const oldSnap = await db.collection("wip_dashboard").doc(key).get();
+                    if (oldSnap.exists) return JSON.parse(oldSnap.data().payload);
+                    return null;
+                }
+
+                const chunksCount = metaSnap.data().chunks;
+                const runId = metaSnap.data().runId;
+                let fullString = "";
+                
+                for (let i = 0; i < chunksCount; i++) {
+                    const docId = runId ? `${key}_${runId}_${i}` : `${key}_${i}`;
+                    const chunkSnap = await db.collection("wip_dashboard").doc(docId).get();
+                    if (chunkSnap.exists) {
+                        fullString += chunkSnap.data().payload;
+                    } else {
+                        console.error(`Pecahan data hilang: ${docId}`);
+                        return null; // Data korup, kembalikan null untuk cegah error JSON
+                    }
+                }
+                return JSON.parse(fullString);
+            } catch(e) { 
+                console.error("Firebase Load Error:", e); 
+                if (e instanceof SyntaxError) {
+                   showToast("Data dari server terdeteksi tidak lengkap (korup). Silakan upload ulang file Excel Anda.", "error");
+                }
+                return null; 
+            }
         }
 
         // ==========================================
@@ -530,6 +607,10 @@
         let globalUniquePeriodeWPP = []; 
         let globalCutoffPWKey = null; 
         let globalDelayPWKey = null;  
+
+        let uploadedMasterFiles = [];
+        let uploadedWipFiles = [];
+        let masterHeadersSet = new Set();
 
         let activePeriodeTab = 'ALL';
         let activeOverviewCat = 'ALL';
@@ -575,16 +656,23 @@
             }
         };
 
+        const safeSetHTML = (id, htmlContent) => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = htmlContent;
+        };
+
+        const safeSetText = (id, textContent) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = textContent;
+        };
+
         function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast ${type}`;
+            const container = document.getElementById('toast-container'); 
+            if(!container) return;
+            const toast = document.createElement('div'); toast.className = `toast ${type}`;
             toast.innerHTML = `<div class="flex items-center gap-2"><i data-lucide="${type === 'success' ? 'check-circle' : 'info'}" class="w-4 h-4"></i>${message}</div>`;
             container.appendChild(toast); lucide.createIcons(); setTimeout(() => toast.classList.add('show'), 10);
             setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 4000);
-        }
-
-        const safeSetText = (id, text) => {
-            const el = document.getElementById(id);
-            if (el) el.innerText = text;
         }
 
         function sanitizeHeaders(headersArray) {
@@ -601,7 +689,11 @@
             let wp = String(wpStr).toUpperCase();
             if(wp.includes('E') || wp.includes('A')) return 'ADD'; if(wp.includes('C')) return 'CAT'; if(wp.includes('/')) return 'REG'; if(wp.includes('S')) return 'SMC'; if(wp.includes('-')) return 'SMV'; return 'OTHER';
         }
-        function getWPP(wpStr) { let match = String(wpStr).trim().match(/^(\d+)/); return match ? match[1] : wpStr; }
+        
+        function getWPP(wpStr) { 
+            let match = String(wpStr).trim().match(/^(\d+)/); 
+            return match ? match[1] : wpStr; 
+        }
         
         function isDateColumn(headerName) {
             let upper = String(headerName).toUpperCase();
@@ -612,23 +704,26 @@
             if(!value) return null;
             if(typeof value === 'number') {
                 let d = new Date(Math.round((value - 25569) * 86400 * 1000));
-                return isNaN(d) ? null : d;
+                if(isNaN(d.getTime())) return null;
+                return d;
             }
             if(typeof value === 'string') {
                 let parts = value.split(/[-/]/);
                 if (parts.length === 3) {
-                    if (parts[2].length === 4) return new Date(parts[2], parts[1] - 1, parts[0]);
-                    if (parts[0].length === 4) return new Date(parts[0], parts[1] - 1, parts[2]);
+                    if (parts[2].length === 4) { let d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])); return isNaN(d.getTime()) ? null : d; }
+                    if (parts[0].length === 4) { let d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])); return isNaN(d.getTime()) ? null : d; }
                 }
                 let d = new Date(value);
-                return isNaN(d) ? null : d;
+                return isNaN(d.getTime()) ? null : d;
             }
             return null;
         }
 
         function formatExcelDateStr(value) {
             let d = parseExcelDate(value);
-            if(d) return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+            if(d instanceof Date && !isNaN(d.getTime())) {
+                return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+            }
             return value;
         }
 
@@ -639,8 +734,14 @@
 
         function parseIndoDate(str) {
             if (!str) return 0;
-            let parts = str.split('-'); 
-            if(parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]).getTime();
+            let parts = str.split(/[-/]/); 
+            if(parts.length === 3) {
+                let d = parts[2].length === 4 
+                    ? new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0])) 
+                    : new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+                d.setHours(0,0,0,0);
+                return d.getTime();
+            }
             return 0;
         }
 
@@ -649,11 +750,78 @@
             if(charts[ctxId]) { charts[ctxId].destroy(); } 
             
             if(!options) options = {};
-            // Disable overly aggressive resolution forcing to prevent WebGL crash
-            // Chart.js natively handles retina displays correctly when left alone or gently nudged
-            options.devicePixelRatio = window.devicePixelRatio > 1 ? window.devicePixelRatio : 2;
+            options.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2.5);
             
             charts[ctxId] = new Chart(el.getContext('2d'), { type: type, data: data, options: options, plugins: [thresholdBgPlugin] });
+        }
+
+        function preventD(e) { e.preventDefault(); e.stopPropagation(); }
+
+        function readExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve({ name: file.name, data: new Uint8Array(e.target.result) });
+                reader.onerror = (e) => reject(e);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function renderUploadedFiles() {
+            const masterList = document.getElementById('master-file-list');
+            if(masterList) {
+                if(uploadedMasterFiles.length === 0) masterList.innerHTML = '<p class="text-[10px] text-gray-400 font-medium">Belum ada file Master tergabung.</p>';
+                else {
+                    masterList.innerHTML = uploadedMasterFiles.map(f => `
+                        <div class="flex items-center justify-between bg-white border border-indigo-100 px-3 py-2 rounded-lg shadow-sm hover:border-indigo-300 transition group">
+                            <div class="flex items-center gap-2 truncate"><i data-lucide="file-spreadsheet" class="w-4 h-4 text-indigo-500 shrink-0"></i><span class="text-[11px] font-bold text-gray-700 truncate" title="${f}">${f}</span></div>
+                            <button onclick="removeMasterFile('${f}')" title="Hapus spesifik WPP dari file ini" class="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition shrink-0"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    `).join('');
+                }
+            }
+            const wipList = document.getElementById('wip-file-list');
+            if(wipList) {
+                if(uploadedWipFiles.length === 0) wipList.innerHTML = '<p class="text-[10px] text-gray-400 font-medium">Belum ada file WIP tergabung.</p>';
+                else {
+                    wipList.innerHTML = uploadedWipFiles.map(f => `
+                        <div class="flex items-center justify-between bg-white border border-brand-100 px-3 py-2 rounded-lg shadow-sm hover:border-brand-300 transition group">
+                            <div class="flex items-center gap-2 truncate"><i data-lucide="file-spreadsheet" class="w-4 h-4 text-brand-500 shrink-0"></i><span class="text-[11px] font-bold text-gray-700 truncate" title="${f}">${f}</span></div>
+                            <button onclick="removeWipFile('${f}')" title="Hapus spesifik data dari file ini" class="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition shrink-0"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    `).join('');
+                }
+            }
+            lucide.createIcons();
+        }
+
+        async function removeMasterFile(filename) {
+            if(confirm(`Yakin ingin MENCABUT seluruh data yang berasal dari file: ${filename}?`)) {
+                globalMasterData = globalMasterData.filter(m => m._sourceFile !== filename);
+                uploadedMasterFiles = uploadedMasterFiles.filter(f => f !== filename);
+                try {
+                    await saveDB('master_data', globalMasterData);
+                    await saveDB('uploaded_master_files', uploadedMasterFiles);
+                    safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
+                    renderUploadedFiles();
+                    try { setupControlHeaders(); } catch(e){}
+                    await recalculateValidation();
+                    showToast(`Data dari file ${filename} berhasil dicabut.`, 'success');
+                } catch(e) {}
+            }
+        }
+
+        async function removeWipFile(filename) {
+            if(confirm(`Yakin ingin MENCABUT data WIP yang berasal dari file: ${filename}?`)) {
+                globalWipData = globalWipData.filter(w => w._sourceFile !== filename);
+                uploadedWipFiles = uploadedWipFiles.filter(f => f !== filename);
+                try {
+                    await saveDB('wip_data', globalWipData);
+                    await saveDB('uploaded_wip_files', uploadedWipFiles);
+                    renderUploadedFiles();
+                    await recalculateValidation();
+                    showToast(`Data WIP dari file ${filename} berhasil dicabut.`, 'success');
+                } catch(e) {}
+            }
         }
 
         // ==========================================
@@ -664,7 +832,15 @@
             Chart.register(ChartDataLabels);
             Chart.defaults.set('plugins.datalabels', { display: false });
 
-            const overlay = document.getElementById('loading-overlay'); overlay.classList.remove('hidden');
+            const overlay = document.getElementById('loading-overlay'); 
+            if(overlay) overlay.classList.remove('hidden');
+
+            if (!isFirebaseActive) {
+                showToast("Firebase Gagal Konek! Cek config API.", "error");
+                if(overlay) overlay.classList.add('hidden');
+                switchTab('master');
+                return;
+            }
             
             globalMasterData = (await loadDB('master_data')) || [];
             globalWipData = (await loadDB('wip_data')) || [];
@@ -673,30 +849,30 @@
             globalCutoffPWKey = await loadDB('global_cutoff_key');
             globalDelayPWKey = await loadDB('global_delay_key');
             masterHeaders = sanitizeHeaders(await loadDB('master_headers'));
+            
+            uploadedMasterFiles = (await loadDB('uploaded_master_files')) || [];
+            uploadedWipFiles = (await loadDB('uploaded_wip_files')) || [];
+            masterHeaders.forEach(h => masterHeadersSet.add(h));
 
             let lastWipDate = await loadDB('last_wip_date');
             let todayStr = getTodayDateStr();
 
             if (lastWipDate && lastWipDate !== todayStr && globalWipData.length > 0) {
-                globalWipData = [];
-                await saveDB('wip_data', []);
+                globalWipData = []; uploadedWipFiles = [];
+                await saveDB('wip_data', []); await saveDB('uploaded_wip_files', []);
                 showToast("Hari baru dimulai! Data WIP kemarin telah dibersihkan otomatis.", "warning");
             }
 
             if(globalMasterData.length > 0) {
-                updateWipDependencies();
-                updateInputStats(); 
-                updateGlobalThresholdUI(); 
+                updateWipDependencies(); updateInputStats(); updateGlobalThresholdUI(); renderUploadedFiles();
                 try { setupControlHeaders(); } catch(e) { console.error(e); }
                 document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
                 document.getElementById('global-threshold-bar').classList.remove('hidden');
                 document.getElementById('btn-reset').classList.remove('hidden');
                 switchTab('overview');
             } else { switchTab('master'); }
-            overlay.classList.add('hidden');
             
-            // NYALAKAN RADAR SINKRONISASI REALTIME
-            setupRealtimeSync();
+            if(overlay) overlay.classList.add('hidden');
         };
 
         function updateWipDependencies() {
@@ -724,7 +900,9 @@
                 }
             });
 
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const viewActive = document.getElementById(`view-${tabId}`);
+            if(viewActive) viewActive.classList.remove('hidden');
+
             let activeBtn = document.getElementById(`btn-tab-${tabId}`);
             if(activeBtn) {
                 if(tabId === 'overview') activeBtn.className = "px-3 py-1.5 rounded-md text-xs font-semibold transition bg-brand-50 text-brand-700 border border-brand-200 shadow-sm";
@@ -736,41 +914,51 @@
             if(tabId === 'report') renderReportWIP();
             if(tabId === 'control') { renderControlPeriodeTabs(); renderControlOutstanding(); }
             if(tabId === 'sh') renderShMaterials();
-            if(tabId === 'master') safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
-            if(tabId === 'input') updateInputStats();
+            if(tabId === 'master') { safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy'); renderUploadedFiles(); }
+            if(tabId === 'input') { updateInputStats(); renderUploadedFiles(); }
             lucide.createIcons();
         }
 
         async function resetData() {
-            if(confirm("Yakin melakukan Factory Reset? Seluruh Data Master, WIP, dan SH Material akan dihapus permanen.")) {
+            if(confirm("Yakin melakukan Factory Reset? Seluruh Data Master, WIP, dan SH Material akan dihapus permanen di Server Cloud.")) {
                 globalMasterData = []; globalWipData = []; globalUniquePeriodeWPP = []; dailyHistory = []; 
                 globalCutoffPWKey = null; globalDelayPWKey = null; masterHeaders = []; activePeriodeTab = 'ALL'; activeOverviewCat = 'ALL'; activeOverdueWP = 'ALL'; activeClosedWP = 'ALL';
-                await saveDB('master_data', []); await saveDB('wip_data', []); await saveDB('daily_history', []); 
-                await saveDB('global_cutoff_key', null); await saveDB('global_delay_key', null); await saveDB('master_headers', []);
-                document.getElementById('nav-center-menus').classList.remove('flex'); document.getElementById('nav-center-menus').classList.add('hidden');
-                document.getElementById('global-threshold-bar').classList.add('hidden');
-                document.getElementById('btn-reset').classList.add('hidden');
-                updateInputStats(); switchTab('master'); showToast('Factory Reset Berhasil.', 'success');
+                uploadedMasterFiles = []; uploadedWipFiles = []; masterHeadersSet.clear();
+                
+                try {
+                    await saveDB('master_data', []); await saveDB('wip_data', []); await saveDB('daily_history', []); 
+                    await saveDB('global_cutoff_key', null); await saveDB('global_delay_key', null); await saveDB('master_headers', []);
+                    await saveDB('uploaded_master_files', []); await saveDB('uploaded_wip_files', []);
+                    
+                    document.getElementById('nav-center-menus').classList.remove('flex'); document.getElementById('nav-center-menus').classList.add('hidden');
+                    document.getElementById('global-threshold-bar').classList.add('hidden');
+                    document.getElementById('btn-reset').classList.add('hidden');
+                    updateInputStats(); switchTab('master'); showToast('Factory Reset Berhasil.', 'success');
+                } catch(e) {}
             }
         }
 
         async function resetMasterData() {
-            if(confirm("Hapus SELURUH Master Data MPP? Tindakan ini tidak dapat dibatalkan.")) {
-                globalMasterData = []; masterHeaders = []; activePeriodeTab = 'ALL';
-                await saveDB('master_data', []); await saveDB('master_headers', []);
-                safeSetText('info-master-count', '0 Assy');
-                showToast('Database Master telah dikosongkan.', 'success');
-                try { setupControlHeaders(); } catch(e){} renderOverviewDashboard();
+            if(confirm("Hapus SELURUH Master Data MPP dari Server? Tindakan ini tidak dapat dibatalkan.")) {
+                globalMasterData = []; masterHeaders = []; activePeriodeTab = 'ALL'; uploadedMasterFiles = []; masterHeadersSet.clear();
+                try {
+                    await saveDB('master_data', []); await saveDB('master_headers', []); await saveDB('uploaded_master_files', []);
+                    safeSetText('info-master-count', '0 Assy');
+                    showToast('Database Master telah dikosongkan.', 'success');
+                    try { setupControlHeaders(); } catch(e){} renderUploadedFiles(); renderOverviewDashboard();
+                } catch(e) {}
             }
         }
 
         async function resetWipData() {
-            if(confirm("Hapus Data WIP Harian? Ini akan mengosongkan matriks Resume Analisis.")) {
-                globalWipData = [];
-                await saveDB('wip_data', []); await saveDB('last_wip_date', null);
-                safeSetText('info-last-sync', '-');
-                updateWipDependencies(); renderOverviewDashboard(); renderReportWIP();
-                showToast('Data WIP Harian telah dikosongkan.', 'success');
+            if(confirm("Hapus Data WIP Harian dari Server? Ini akan mengosongkan matriks Resume Analisis.")) {
+                globalWipData = []; uploadedWipFiles = [];
+                try {
+                    await saveDB('wip_data', []); await saveDB('last_wip_date', null); await saveDB('uploaded_wip_files', []);
+                    safeSetText('info-last-sync', '-');
+                    updateWipDependencies(); renderUploadedFiles(); renderOverviewDashboard(); renderReportWIP();
+                    showToast('Data WIP Harian telah dikosongkan.', 'success');
+                } catch(e) {}
             }
         }
 
@@ -786,7 +974,7 @@
         }
 
         // ==========================================
-        // 4. UPLOAD & PARSING LOGIC
+        // 4. MULTI-UPLOAD & PARSING LOGIC
         // ==========================================
         
         const dropZoneMaster = document.getElementById('drop-zone-master'); const fileInputMaster = document.getElementById('file-input-master');
@@ -794,119 +982,110 @@
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => { dropZoneMaster.addEventListener(e, preventD, false); document.body.addEventListener(e, preventD, false); });
         ['dragenter', 'dragover'].forEach(e => dropZoneMaster.addEventListener(e, () => dropZoneMaster.classList.add('drag-active'), false));
         ['dragleave', 'drop'].forEach(e => dropZoneMaster.addEventListener(e, () => dropZoneMaster.classList.remove('drag-active'), false));
-        dropZoneMaster.addEventListener('drop', (e) => { if(e.dataTransfer.files.length > 0) processMasterExcel(e.dataTransfer.files[0]); });
-        fileInputMaster.addEventListener('change', (e) => { if(e.target.files.length > 0) processMasterExcel(e.target.files[0]); });
+        dropZoneMaster.addEventListener('drop', (e) => { if(e.dataTransfer.files.length > 0) processMasterFiles(e.dataTransfer.files); });
+        fileInputMaster.addEventListener('change', (e) => { if(e.target.files.length > 0) processMasterFiles(e.target.files); });
 
-        function preventD(e) { e.preventDefault(); e.stopPropagation(); }
-
-        function processMasterExcel(file) {
+        async function processMasterFiles(files) {
+            if(!isFirebaseActive) { showToast("Firebase belum aktif!", "error"); return; }
             const overlay = document.getElementById('loading-overlay'); overlay.classList.remove('hidden');
-            setLoaderState('Membaca Master Data...', 'Mengekstrak seluruh Sheet (Kecuali Summary).', 0, '');
-
-            setTimeout(() => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        const data = new Uint8Array(e.target.result); 
-                        const workbook = XLSX.read(data, {type: 'array'});
+            
+            let newAssyCount = 0; let updatedAssyCount = 0;
+            
+            for(let i=0; i<files.length; i++) {
+                let file = files[i];
+                let pct = Math.floor((i / files.length) * 100);
+                setLoaderState('Membaca File Master...', `Memproses ${file.name}`, pct, `File ${i+1} dari ${files.length}`);
+                
+                try {
+                    let fileObj = await readExcelFile(file);
+                    let workbook = XLSX.read(fileObj.data, {type: 'array'});
+                    
+                    globalMasterData = globalMasterData.filter(m => m._sourceFile !== file.name);
+                    if(!uploadedMasterFiles.includes(file.name)) uploadedMasterFiles.push(file.name);
+                    
+                    let totalSheets = workbook.SheetNames.length;
+                    let sheetsToProcess = totalSheets > 1 ? totalSheets - 1 : 1;
+                    
+                    for(let s=0; s<sheetsToProcess; s++) {
+                        let sheetName = workbook.SheetNames[s];
+                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header: 1});
                         
-                        let newAssyCount = 0; let updatedAssyCount = 0;
-                        let globalHeadersMap = new Set();
+                        let headerIndex = -1;
+                        for (let r = 0; r < jsonData.length; r++) { 
+                            if (!jsonData[r] || !Array.isArray(jsonData[r])) continue;
+                            let rowStr = jsonData[r].map(c => String(c).toUpperCase()).join('|');
+                            if (rowStr.includes('CUSTOMER') && rowStr.includes('ASSY')) { headerIndex = r; break; } 
+                        }
                         
-                        let totalSheets = workbook.SheetNames.length;
-                        let sheetsToProcess = totalSheets > 1 ? totalSheets - 1 : 1; 
-                        let sheetsProcessed = 0;
+                        if(headerIndex !== -1) {
+                            let rawHeaders = jsonData[headerIndex];
+                            let mappedHeaders = rawHeaders.map(h => {
+                                if (!h) return '';
+                                let cleanH = String(h).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+                                if (cleanH === 'ASSY NO' || cleanH === 'ASSY NO.') return 'ASSY';
+                                if (cleanH === 'TOTAL CCT ') return 'TOTAL CCT'; 
+                                return cleanH;
+                            });
+                            mappedHeaders.forEach(h => { if(h) masterHeadersSet.add(h); });
 
-                        function processNextSheet() {
-                            if (sheetsProcessed >= sheetsToProcess) {
-                                masterHeaders = sanitizeHeaders(Array.from(globalHeadersMap));
-                                (async () => {
-                                    await saveDB('master_data', globalMasterData);
-                                    await saveDB('master_headers', masterHeaders);
-                                    
-                                    try { setupControlHeaders(); } catch(e){}
-                                    updateInputStats(); updateGlobalThresholdUI();
-                                    
-                                    document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
-                                    document.getElementById('global-threshold-bar').classList.remove('hidden');
-                                    document.getElementById('btn-reset').classList.remove('hidden');
-                                    
-                                    overlay.classList.add('hidden');
-                                    showToast(`Master Update dari ${sheetsToProcess} Sheet: ${newAssyCount} Baru, ${updatedAssyCount} Diperbarui.`, 'success');
-                                    safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
-                                    
-                                    if(globalWipData.length > 0) recalculateValidation();
-                                    else switchTab('overview');
-                                })();
-                                return;
-                            }
-
-                            let sheetName = workbook.SheetNames[sheetsProcessed];
-                            let pct = Math.floor(((sheetsProcessed + 1) / sheetsToProcess) * 100);
-                            setLoaderState('Parsing Sheet...', `Memproses: ${sheetName}`, pct, `Sheet ${sheetsProcessed + 1} / ${sheetsToProcess}`);
-                            
-                            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header: 1});
-
-                            let headerIndex = -1;
-                            for (let i = 0; i < jsonData.length; i++) { 
-                                if (!jsonData[i] || !Array.isArray(jsonData[i])) continue;
-                                let rowStr = jsonData[i].map(c => String(c).toUpperCase()).join('|');
-                                if (rowStr.includes('CUSTOMER') && rowStr.includes('ASSY')) { headerIndex = i; break; } 
-                            }
-                            
-                            if(headerIndex !== -1) {
-                                let rawHeaders = jsonData[headerIndex];
-                                let mappedHeaders = rawHeaders.map(h => {
-                                    if (!h) return '';
-                                    let cleanH = String(h).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
-                                    if (cleanH === 'ASSY NO' || cleanH === 'ASSY NO.') return 'ASSY';
-                                    if (cleanH === 'TOTAL CCT ') return 'TOTAL CCT'; 
-                                    return cleanH;
+                            for (let r = headerIndex + 1; r < jsonData.length; r++) {
+                                const row = jsonData[r]; if(!row || row.length === 0) continue;
+                                let obj = {};
+                                mappedHeaders.forEach((h, index) => { 
+                                    if(h && row[index] !== undefined) {
+                                        let val = row[index];
+                                        if (isDateColumn(h) && typeof val === 'number' && val > 30000) obj[h] = formatExcelDateStr(val);
+                                        else obj[h] = val;
+                                    } 
                                 });
-                                mappedHeaders.forEach(h => { if(h) globalHeadersMap.add(h); });
+                                
+                                if(!obj['ASSY']) continue;
+                                
+                                let lineVal = String(obj['LINE'] || obj['LINE '] || '').toUpperCase();
+                                if (lineVal.includes('PROTO') || /\bPT\b/.test(lineVal) || lineVal === 'LINE PT') continue;
 
-                                for (let i = headerIndex + 1; i < jsonData.length; i++) {
-                                    const row = jsonData[i]; if(!row || row.length === 0) continue;
-                                    let obj = {};
-                                    mappedHeaders.forEach((h, index) => { 
-                                        if(h && row[index] !== undefined) {
-                                            let val = row[index];
-                                            if (isDateColumn(h) && typeof val === 'number' && val > 30000) obj[h] = formatExcelDateStr(val);
-                                            else obj[h] = val;
-                                        } 
-                                    });
-                                    
-                                    if(!obj['ASSY']) continue;
-                                    
-                                    let lineVal = String(obj['LINE'] || obj['LINE '] || '').toUpperCase();
-                                    if (lineVal.includes('PROTO') || /\bPT\b/.test(lineVal) || lineVal === 'LINE PT') continue;
+                                let assyStr = String(obj['ASSY']).trim().toUpperCase();
+                                let perStr = String(obj['PERIODE'] || '').trim().toUpperCase();
+                                let wpStr = String(obj['WP'] || '').trim().toUpperCase();
+                                let uid = `${assyStr}_${perStr}_${wpStr}`;
+                                
+                                obj._uid = uid; obj._sourceFile = file.name;
 
-                                    let assyStr = String(obj['ASSY']).trim().toUpperCase();
-                                    let perStr = String(obj['PERIODE'] || '').trim().toUpperCase();
-                                    let wpStr = String(obj['WP'] || '').trim().toUpperCase();
-                                    
-                                    let uid = `${assyStr}_${perStr}_${wpStr}`;
-
-                                    let existing = globalMasterData.find(m => m._uid === uid);
-                                    if(existing) {
-                                        Object.assign(existing, obj); 
-                                        if(!existing._status) existing._status = 'OPEN';
-                                        updatedAssyCount++;
-                                    } else {
-                                        obj._uid = uid;
-                                        obj._status = 'OPEN'; 
-                                        globalMasterData.push(obj);
-                                        newAssyCount++;
-                                    }
+                                let existingIdx = globalMasterData.findIndex(m => m._uid === uid);
+                                if(existingIdx !== -1) {
+                                    Object.assign(globalMasterData[existingIdx], obj); 
+                                    if(!globalMasterData[existingIdx]._status) globalMasterData[existingIdx]._status = 'OPEN';
+                                    updatedAssyCount++;
+                                } else {
+                                    obj._status = 'OPEN'; globalMasterData.push(obj); newAssyCount++;
                                 }
                             }
-                            sheetsProcessed++; setTimeout(processNextSheet, 10); 
                         }
-                        processNextSheet();
-                    } catch(err) { overlay.classList.add('hidden'); showToast("Error: " + err.message, 'error'); }
-                };
-                reader.readAsArrayBuffer(file);
-            }, 100);
+                    }
+                } catch(err) { console.error(err); showToast(`Error pada file ${file.name}`, 'error'); }
+            }
+            
+            masterHeaders = sanitizeHeaders(Array.from(masterHeadersSet));
+            
+            try {
+                await saveDB('master_data', globalMasterData);
+                await saveDB('master_headers', masterHeaders);
+                await saveDB('uploaded_master_files', uploadedMasterFiles);
+                
+                try { setupControlHeaders(); } catch(e){}
+                updateInputStats(); updateGlobalThresholdUI(); renderUploadedFiles();
+                
+                document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
+                document.getElementById('global-threshold-bar').classList.remove('hidden');
+                document.getElementById('btn-reset').classList.remove('hidden');
+                
+                overlay.classList.add('hidden');
+                showToast(`Master Update Selesai: ${newAssyCount} Baru, ${updatedAssyCount} Ditimpa.`, 'success');
+                safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
+                
+                if(globalWipData.length > 0) await recalculateValidation();
+                else switchTab('overview');
+            } catch(e) { overlay.classList.add('hidden'); }
         }
 
         const dropZoneWip = document.getElementById('drop-zone-wip'); const fileInputWip = document.getElementById('file-input-wip');
@@ -914,138 +1093,92 @@
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => { dropZoneWip.addEventListener(e, preventD, false); document.body.addEventListener(e, preventD, false); });
         ['dragenter', 'dragover'].forEach(e => dropZoneWip.addEventListener(e, () => dropZoneWip.classList.add('drag-active'), false));
         ['dragleave', 'drop'].forEach(e => dropZoneWip.addEventListener(e, () => dropZoneWip.classList.remove('drag-active'), false));
-        dropZoneWip.addEventListener('drop', (e) => { if(e.dataTransfer.files.length > 0) processWIPExcel(e.dataTransfer.files[0]); });
-        fileInputWip.addEventListener('change', (e) => { if(e.target.files.length > 0) processWIPExcel(e.target.files[0]); });
+        dropZoneWip.addEventListener('drop', (e) => { if(e.dataTransfer.files.length > 0) processWIPFiles(e.dataTransfer.files); });
+        fileInputWip.addEventListener('change', (e) => { if(e.target.files.length > 0) processWIPFiles(e.target.files); });
 
-        function processWIPExcel(file) {
-            if(globalMasterData.length === 0) { showToast('Upload Master Data (MPP) terlebih dahulu sebelum validasi WIP!', 'warning'); return; }
+        async function processWIPFiles(files) {
+            if(!isFirebaseActive) { showToast("Firebase belum aktif!", "error"); return; }
+            if(globalMasterData.length === 0) { showToast('Upload Master Data (MPP) terlebih dahulu!', 'warning'); return; }
             
             const overlay = document.getElementById('loading-overlay'); overlay.classList.remove('hidden');
-            setLoaderState('Menyiapkan Validasi...', 'Membaca WIP Harian.', 0, '');
-
-            let today = new Date(); today.setHours(0,0,0,0);
             let todayStr = getTodayDateStr();
-            let todayTime = today.getTime();
 
-            setTimeout(() => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, {type: 'array'});
-                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+            for(let i=0; i<files.length; i++) {
+                let file = files[i];
+                let pct = Math.floor((i / files.length) * 100);
+                setLoaderState('Menyiapkan Validasi...', `Memproses WIP: ${file.name}`, pct, `File ${i+1}/${files.length}`);
 
-                        let headerIndex = -1;
-                        for (let i = 0; i < jsonData.length; i++) { 
-                            if (!jsonData[i] || !Array.isArray(jsonData[i])) continue;
-                            let rowStr = jsonData[i].map(c => String(c).toUpperCase()).join('|');
-                            if (rowStr.includes('CUSTOMER') && rowStr.includes('ASSY')) { headerIndex = i; break; } 
+                try {
+                    let fileObj = await readExcelFile(file);
+                    let workbook = XLSX.read(fileObj.data, {type: 'array'});
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+
+                    globalWipData = globalWipData.filter(w => w._sourceFile !== file.name);
+                    if(!uploadedWipFiles.includes(file.name)) uploadedWipFiles.push(file.name);
+
+                    let headerIndex = -1;
+                    for (let r = 0; r < jsonData.length; r++) { 
+                        if (!jsonData[r] || !Array.isArray(jsonData[r])) continue;
+                        let rowStr = jsonData[r].map(c => String(c).toUpperCase()).join('|');
+                        if (rowStr.includes('CUSTOMER') && rowStr.includes('ASSY')) { headerIndex = r; break; } 
+                    }
+
+                    if(headerIndex !== -1) {
+                        let rawHeaders = jsonData[headerIndex];
+                        let headers = rawHeaders.map(h => {
+                            if(!h) return '';
+                            let cleanH = String(h).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+                            if (cleanH === 'ASSY NO' || cleanH === 'ASSY NO.') return 'ASSY';
+                            return cleanH;
+                        });
+                        
+                        if(!headers[2] || String(headers[2]).trim() === '') headers[2] = 'LINE';
+                        
+                        for (let r = headerIndex + 1; r < jsonData.length; r++) {
+                            const row = jsonData[r]; if(!row || row.length === 0 || !row[0]) continue;
+                            let obj = {}; 
+                            headers.forEach((cleanH, idx) => { 
+                                if(cleanH) { 
+                                    if(obj[cleanH]) cleanH+="_2"; 
+                                    let val = row[idx];
+                                    if (isDateColumn(cleanH) && typeof val === 'number' && val > 30000) obj[cleanH] = formatExcelDateStr(val);
+                                    else obj[cleanH] = val;
+                                } 
+                            });
+
+                            let lineVal = String(obj['LINE'] || '').toUpperCase();
+                            if (lineVal.includes('PROTO') || /\bPT\b/.test(lineVal) || lineVal === 'LINE PT') continue;
+
+                            let ppValRaw = String(obj['PP'] || '').trim();
+                            if (ppValRaw === '-' || ppValRaw === '') continue; 
+                            let ppVal = parseFloat(ppValRaw);
+                            if(isNaN(ppVal) || ppVal <= 0) continue; 
+
+                            let assy = String(obj['ASSY'] || '').trim().toUpperCase();
+                            let perStr = String(obj['PERIODE'] || '').trim().toUpperCase();
+                            let wpStr = String(obj['WP'] || '').trim().toUpperCase();
+                            let uid = `${assy}_${perStr}_${wpStr}`;
+                            
+                            obj._uid = uid; obj._sourceFile = file.name;
+                            
+                            let existingIdx = globalWipData.findIndex(w => w._uid === uid);
+                            if(existingIdx !== -1) globalWipData[existingIdx] = obj;
+                            else globalWipData.push(obj);
                         }
+                    } else { showToast(`Format File WIP Salah: ${file.name}`, 'error'); }
+                } catch(err) { console.error(err); showToast(`Error WIP ${file.name}`, 'error'); }
+            }
 
-                        if(headerIndex !== -1) {
-                            let rawHeaders = jsonData[headerIndex];
-                            let headers = rawHeaders.map(h => {
-                                if(!h) return '';
-                                let cleanH = String(h).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
-                                if (cleanH === 'ASSY NO' || cleanH === 'ASSY NO.') return 'ASSY';
-                                return cleanH;
-                            });
-                            
-                            if(!headers[2] || String(headers[2]).trim() === '') headers[2] = 'LINE';
-
-                            let wipUidSet = new Set();
-                            let parsedWipData = []; 
-                            let wipRowMap = new Map();
-                            
-                            for (let i = headerIndex + 1; i < jsonData.length; i++) {
-                                const row = jsonData[i]; if(!row || row.length === 0 || !row[0]) continue;
-                                let obj = {}; 
-                                headers.forEach((cleanH, idx) => { 
-                                    if(cleanH) { 
-                                        if(obj[cleanH]) cleanH+="_2"; 
-                                        let val = row[idx];
-                                        if (isDateColumn(cleanH) && typeof val === 'number' && val > 30000) obj[cleanH] = formatExcelDateStr(val);
-                                        else obj[cleanH] = val;
-                                    } 
-                                });
-
-                                let lineVal = String(obj['LINE'] || '').toUpperCase();
-                                if (lineVal.includes('PROTO') || /\bPT\b/.test(lineVal) || lineVal === 'LINE PT') continue;
-
-                                let ppValRaw = String(obj['PP'] || '').trim();
-                                if (ppValRaw === '-' || ppValRaw === '') continue; 
-                                let ppVal = parseFloat(ppValRaw);
-                                if(isNaN(ppVal) || ppVal <= 0) continue; 
-
-                                let assy = String(obj['ASSY'] || '').trim().toUpperCase();
-                                let perStr = String(obj['PERIODE'] || '').trim().toUpperCase();
-                                let wpStr = String(obj['WP'] || '').trim().toUpperCase();
-                                let uid = `${assy}_${perStr}_${wpStr}`;
-                                
-                                if(assy) wipUidSet.add(uid);
-                                obj._uid = uid;
-                                parsedWipData.push(obj);
-                                wipRowMap.set(uid, obj);
-                            }
-
-                            setLoaderState('Cross-Validation...', 'Mencocokkan Master vs WIP', 50, '');
-                            let closedCount = 0; let cnd3Count = 0; let cnd2Count = 0; let openCount = 0;
-                            
-                            // VALIDASI MUTLAK
-                            globalMasterData.forEach(masterRow => {
-                                let uid = masterRow._uid;
-                                let stwcTime = parseIndoDate(masterRow['STWC']);
-                                let stwcDateObj = stwcTime > 0 ? new Date(stwcTime) : null;
-                                if (stwcDateObj) stwcDateObj.setHours(0,0,0,0);
-                                let diffDays = stwcDateObj ? (todayTime - stwcDateObj.getTime()) / 86400000 : 0;
-                                
-                                let wipRow = wipRowMap.get(uid);
-                                let isWipCnd3 = wipRow && String(wipRow['CND'] || '').toUpperCase().includes('CND 3');
-
-                                if (!wipUidSet.has(uid)) {
-                                    if(masterRow._status !== 'CLOSED') { masterRow._closedDate = todayStr; closedCount++; }
-                                    masterRow._status = 'CLOSED';
-                                } else {
-                                    if (isWipCnd3 || diffDays >= 2) {
-                                        masterRow._status = 'CND 3'; cnd3Count++;
-                                    } else if (diffDays === 1) {
-                                        masterRow._status = 'CND 2'; cnd2Count++;
-                                    } else {
-                                        masterRow._status = 'OPEN'; openCount++;
-                                    }
-                                }
-                            });
-
-                            globalWipData = parsedWipData;
-                            updateWipDependencies();
-
-                            let totalAct = openCount + cnd3Count + cnd2Count;
-                            let pctOnSched = totalAct > 0 ? (openCount / totalAct) * 100 : 0;
-                            let newHistoryEntry = { dateKey: todayStr, label: new Date().toLocaleDateString('id-ID', {day:'numeric', month:'short'}), cnd3: cnd3Count + cnd2Count, open: openCount, closed: globalMasterData.filter(m=>m._status==='CLOSED').length, pct: pctOnSched, catPct: {} };
-                            
-                            let existingHistoryIdx = dailyHistory.findIndex(h => h.dateKey === todayStr);
-                            if(existingHistoryIdx !== -1) dailyHistory[existingHistoryIdx] = newHistoryEntry;
-                            else dailyHistory.push(newHistoryEntry);
-
-                            (async () => {
-                                await saveDB('master_data', globalMasterData); 
-                                await saveDB('wip_data', globalWipData); 
-                                await saveDB('daily_history', dailyHistory);
-                                await saveDB('last_wip_date', todayStr);
-                                
-                                updateInputStats(); updateGlobalThresholdUI(); try { setupControlHeaders(); } catch(e){}
-                                document.getElementById('nav-center-menus').classList.remove('hidden'); document.getElementById('nav-center-menus').classList.add('flex');
-                                document.getElementById('global-threshold-bar').classList.remove('hidden');
-                                document.getElementById('btn-reset').classList.remove('hidden');
-                                overlay.classList.add('hidden');
-                                showToast(`Validasi Selesai: ${closedCount} Closed, ${cnd2Count} Warning, ${cnd3Count} Overdue.`, 'success');
-                                switchTab('overview');
-                            })();
-
-                        } else { overlay.classList.add('hidden'); showToast("Format File WIP Salah.", 'error'); }
-                    } catch(err) { overlay.classList.add('hidden'); showToast("Error: " + err.message, 'error'); }
-                };
-                reader.readAsArrayBuffer(file);
-            }, 100);
+            try {
+                await saveDB('wip_data', globalWipData); 
+                await saveDB('uploaded_wip_files', uploadedWipFiles);
+                await saveDB('last_wip_date', todayStr);
+                
+                updateInputStats(); renderUploadedFiles();
+                overlay.classList.add('hidden');
+                
+                await recalculateValidation();
+            } catch(e) { overlay.classList.add('hidden'); }
         }
 
         // ==========================================
@@ -1062,7 +1195,7 @@
             });
             
             if(selCutoff && selDelay) {
-                selCutoff.innerHTML = html; selDelay.innerHTML = html;
+                safeSetHTML('cutoff-wpp-select', html); safeSetHTML('delay-wpp-select', html);
                 if(globalCutoffPWKey) selCutoff.value = globalCutoffPWKey;
                 if(globalDelayPWKey) selDelay.value = globalDelayPWKey;
             }
@@ -1072,15 +1205,15 @@
         async function updateDelayThreshold(val) { globalDelayPWKey = val; await saveDB('global_delay_key', val); refreshDashboards(); }
 
         function refreshDashboards() {
-            if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
-            if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
+            const isOverview = !document.getElementById('view-overview')?.classList.contains('hidden');
+            if(isOverview) renderOverviewDashboard();
+            const isReport = !document.getElementById('view-report')?.classList.contains('hidden');
+            if(isReport) renderReportWIP();
         }
 
         async function recalculateValidation() {
-            if (globalWipData.length === 0 || globalMasterData.length === 0) {
-                showToast('Data Master atau WIP kosong.', 'warning');
-                return;
-            }
+            if(!isFirebaseActive) return;
+            if (globalMasterData.length === 0) return;
 
             let today = new Date(); today.setHours(0,0,0,0);
             let todayStr = getTodayDateStr();
@@ -1097,15 +1230,21 @@
 
             globalMasterData.forEach(masterRow => {
                 let uid = masterRow._uid;
+                
+                // PERBAIKAN LOGIKA SELISIH HARI (H+1 / H+2) DENGAN PEMBULATAN MATEMATIS
                 let stwcTime = parseIndoDate(masterRow['STWC']);
-                let stwcDateObj = stwcTime > 0 ? new Date(stwcTime) : null;
-                if (stwcDateObj) stwcDateObj.setHours(0,0,0,0);
-                let diffDays = stwcDateObj ? (todayTime - stwcDateObj.getTime()) / 86400000 : 0;
+                let diffDays = 0;
+                if(stwcTime > 0) {
+                    let stwcDateObj = new Date(stwcTime);
+                    stwcDateObj.setHours(0,0,0,0);
+                    let diffTime = todayTime - stwcDateObj.getTime();
+                    diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                }
                 
                 let wipRow = wipRowMap.get(uid);
                 let isWipCnd3 = wipRow && String(wipRow['CND'] || '').toUpperCase().includes('CND 3');
 
-                if (!wipUidSet.has(uid)) {
+                if (globalWipData.length > 0 && !wipUidSet.has(uid)) {
                     if(masterRow._status !== 'CLOSED') { masterRow._closedDate = todayStr; closedCount++; }
                     masterRow._status = 'CLOSED';
                 } else {
@@ -1133,14 +1272,17 @@
                 dailyHistory.push(newHistoryEntry);
             }
 
-            await saveDB('master_data', globalMasterData);
-            await saveDB('daily_history', dailyHistory);
+            try {
+                await saveDB('master_data', globalMasterData);
+                await saveDB('daily_history', dailyHistory);
 
-            showToast('Rekalkulasi Validasi Mutlak Selesai.', 'success');
-            refreshDashboards();
-            try { renderControlOutstanding(); } catch(e){}
+                showToast('Rekalkulasi Validasi Mutlak Selesai.', 'success');
+                refreshDashboards();
+                try { renderControlOutstanding(); } catch(e){}
+            } catch(e) {}
         }
 
+        // Context Switcher logic
         function setOverviewCat(cat) { activeOverviewCat = cat; renderOverviewDashboard(); }
         function setOverdueWPFilter(wpType) { activeOverdueWP = wpType; renderOverviewDashboard(); }
         function setClosedWPFilter(wpType) { activeClosedWP = wpType; renderOverviewDashboard(); }
@@ -1156,20 +1298,26 @@
             }).catch(err => { if(btns) btns.style.display = 'flex'; showToast('Gagal Export Dashboard', 'error'); });
         }
 
+        // PERBAIKAN POP-UP LIST ASSY DRILLDOWN 
         window.openDrilldownModal = function(pwKey, catName) {
             const modal = document.getElementById('drilldown-modal');
             const title = document.getElementById('drilldown-title');
-            const tbody = document.getElementById('drilldown-tbody');
             
             let [per, wpp] = pwKey.split('_');
-            title.innerText = `List Assy - Periode ${per} | WPP ${wpp} (${catName})`;
+            if(title) title.innerText = `List Assy - Periode ${per} | WPP ${wpp} (${catName})`;
             
+            let wipMap = new Map();
+            globalWipData.forEach(w => wipMap.set(w._uid, w));
+
             let filtered = globalMasterData.filter(m => {
                 if(m._status === 'CLOSED') return false; 
                 let mPer = String(m['PERIODE'] || '').trim();
-                let mWpp = getWPP(String(m['WP'] || '').trim());
-                let mCat = getCategoryName(m['WP']);
-                if(mPer !== per || mWpp !== wpp) return false;
+                let mWppStr = String(m['WP'] || '').trim();
+                let mWpp = getWPP(mWppStr);
+                let mCat = getCategoryName(mWppStr);
+                
+                // Mencegah mismatch WPP 05 vs 5
+                if(mPer !== per || parseInt(mWpp) !== parseInt(wpp)) return false;
                 if(catName !== 'ALL' && catName !== 'GRAND' && mCat !== catName) return false;
                 return true;
             });
@@ -1180,25 +1328,36 @@
             });
 
             let totalList = filtered.length;
-            let totalCct = filtered.reduce((sum, m) => sum + (parseFloat(m['TOTAL CCT']) || 0), 0);
-            document.getElementById('drilldown-subtitle').innerHTML = `Total List Assy: <strong>${totalList}</strong> &nbsp;|&nbsp; Total CCT: <strong>${totalCct.toLocaleString()}</strong>`;
+            // Menjumlahkan PP CCT dari WIP agar sama persis dengan tinggi batang grafik
+            let totalCct = filtered.reduce((sum, m) => {
+                let w = wipMap.get(m._uid);
+                let val = w && w['PP CCT'] ? parseFloat(w['PP CCT']) : parseFloat(m['TOTAL CCT']);
+                return sum + (val || 0);
+            }, 0);
+            
+            safeSetHTML('drilldown-subtitle', `Total List Assy: <strong class="text-gray-800">${totalList}</strong> &nbsp;|&nbsp; Total CCT Aktual: <strong class="text-gray-800">${totalCct.toLocaleString()}</strong>`);
 
             let html = '';
             filtered.forEach(m => {
                 let badge = m._status === 'CND 3' ? '<span class="bg-red-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CND 3</span>' : 
                             m._status === 'CND 2' ? '<span class="bg-amber-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CND 2</span>' :
                             '<span class="bg-blue-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">OPEN</span>';
-                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition"><td class="p-2.5 text-center">${badge}</td><td class="p-2.5 font-bold text-gray-800">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500">${m.WP||'-'}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center">${m.QTY||'-'}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${m['TOTAL CCT']||'-'}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px]">${m.CUSTOMER||'-'}</td></tr>`;
+                
+                let w = wipMap.get(m._uid);
+                let cctDisplay = w && w['PP CCT'] ? w['PP CCT'] : (m['TOTAL CCT'] || '-');
+
+                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition"><td class="p-2.5 text-center">${badge}</td><td class="p-2.5 font-bold text-gray-800">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500">${m.WP||'-'}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center">${m.QTY||'-'}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${cctDisplay}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px]">${m.CUSTOMER||'-'}</td></tr>`;
             });
             
             if(filtered.length === 0) html = '<tr><td colspan="7" class="text-center p-6 text-gray-400 font-medium">Tidak ada data aktif di WPP ini.</td></tr>';
             
-            tbody.innerHTML = html;
-            modal.classList.remove('hidden');
+            safeSetHTML('drilldown-tbody', html);
+            if(modal) modal.classList.remove('hidden');
         }
 
         window.closeDrilldown = function() {
-            document.getElementById('drilldown-modal').classList.add('hidden');
+            const modal = document.getElementById('drilldown-modal');
+            if(modal) modal.classList.add('hidden');
         }
 
         function renderOverviewDashboard() {
@@ -1322,7 +1481,6 @@
                 }
             }
 
-            // HITUNG MATRIKS & DATA TREN BERDASARKAN FILTER TAB
             let wppSums = {}; let catSums = { ADD:{}, CAT:{}, REG:{}, SMC:{}, SMV:{} };
             let catStats = { ADD: {load:0, delay:0, onsched:0, sh:0}, CAT: {load:0, delay:0, onsched:0, sh:0}, REG: {load:0, delay:0, onsched:0, sh:0}, SMC: {load:0, delay:0, onsched:0, sh:0}, SMV: {load:0, delay:0, onsched:0, sh:0} };
             let kpiTotalLoad = 0; let kpiDelay = 0; let kpiOnSched = 0; let kpiSH = 0;
@@ -1386,7 +1544,7 @@
                 if (existingHistoryIdx !== -1) {
                     dailyHistory[existingHistoryIdx].pct = currentGlobalPct;
                     dailyHistory[existingHistoryIdx].catPct = currentCatPct;
-                    saveDB('daily_history', dailyHistory); 
+                    if(isFirebaseActive) saveDB('daily_history', dailyHistory); 
                 }
             }
 
@@ -1450,7 +1608,7 @@
                         </div>
                         
                         <!-- Divider -->
-                        <div class="hidden xl:block w-px bg-gray-100 shrink-0 self-stretch my-2"></div>
+                        <div class="hidden xl:block w-px bg-bg-gray-100 shrink-0 self-stretch my-2"></div>
                         
                         <!-- Right: Big Pie Chart + Legend Side by Side -->
                         <div class="flex-[1.5] min-w-[320px] flex items-center justify-center p-4 bg-gray-50/50 rounded-xl border border-gray-100 shadow-inner">
@@ -1500,7 +1658,7 @@
                 });
 
                 createOrUpdateChart(`chartPie_${chartId}`, 'doughnut', {
-                    labels: ['Delay', 'On Sched', 'SH'],
+                    labels: ['Delay', 'On Sched', 'Shortage'],
                     datasets: [{ data: [stats.delay, stats.onsched, stats.sh], backgroundColor: ['#ef4444', '#3b82f6', '#f59e0b'], borderWidth: 2, borderColor: '#ffffff', hoverOffset: 4 }]
                 }, { 
                     responsive: true, maintainAspectRatio: false, 
@@ -1619,7 +1777,7 @@
 
             let currentIndex = 0;
             let pctFinalVal = totalFooters.TOTAL.GRAND > 0 ? Math.round(((totalFooters.TOTAL.GRAND - totalFooters.DELAY.GRAND) / totalFooters.TOTAL.GRAND) * 100) : 0;
-            const matrixTbody = document.getElementById('matrix-tbody'); let matrixHtml = '';
+            let matrixHtml = '';
             
             sortedPeriods.forEach(periode => {
                 let sortedWPPs = Object.keys(matrixData[periode]).sort((a,b) => parseInt(a) - parseInt(b));
@@ -1660,11 +1818,10 @@
                     currentIndex++;
                 });
             });
-            matrixTbody.innerHTML = matrixHtml;
+            safeSetHTML('matrix-tbody', matrixHtml);
 
-            const matrixTfoot = document.getElementById('matrix-tfoot');
             let pctFinalAll = totalFooters.TOTAL.GRAND > 0 ? ((totalFooters.TOTAL.GRAND - totalFooters.DELAY.GRAND) / totalFooters.TOTAL.GRAND * 100).toFixed(4) : 0;
-            matrixTfoot.innerHTML = `
+            let tfootHtml = `
                 <tr class="footer-row text-gray-800 border-t-[3px] border-gray-600">
                     <td colspan="3" class="text-right py-1">TOTAL LOADING</td>
                     <td class="text-right">${totalFooters.TOTAL.ADD.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.CAT.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.REG.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.SMC.toLocaleString()}</td><td class="text-right">${totalFooters.TOTAL.SMV.toLocaleString()}</td>
@@ -1687,6 +1844,7 @@
                     <td class="bg-white border-none"></td><td class="bg-white border-none"></td>
                 </tr>
             `;
+            safeSetHTML('matrix-tfoot', tfootHtml);
         }
 
         // ==========================================
@@ -1756,9 +1914,6 @@
         }
 
         function renderControlPeriodeTabs() {
-            const container = document.getElementById('control-periode-tabs');
-            if(!container) return;
-            
             let periodes = new Set();
             globalMasterData.forEach(m => {
                 let p = String(m['PERIODE'] || '').trim();
@@ -1771,8 +1926,7 @@
             sortedPeriodes.forEach(p => {
                 html += `<button onclick="setActivePeriodeTab('${p}')" class="px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border shadow-sm ${activePeriodeTab === p ? 'bg-brand-500 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}">${p}</button>`;
             });
-            
-            container.innerHTML = html;
+            safeSetHTML('control-periode-tabs', html);
         }
 
         function setActivePeriodeTab(p) {
@@ -1783,16 +1937,12 @@
 
         function setupControlHeaders() {
             renderControlPeriodeTabs();
-            
-            const thead = document.getElementById('control-thead');
-            
             let displayHeaders = targetColumnsDB.filter(col => {
                 return masterHeaders.includes(col) || col === 'STATUS';
             });
             if (displayHeaders.length < 3) displayHeaders = targetColumnsDB; 
 
             let headerHtml = `<tr>`;
-            
             displayHeaders.forEach((col, colIdx) => {
                 headerHtml += `<th class="px-2 py-1.5 border-r border-gray-200 bg-gray-50 font-bold text-[9px] tracking-wider uppercase text-left align-top">
                                 <div class="flex flex-col gap-1 h-full filter-dropdown-container relative">
@@ -1834,34 +1984,26 @@
                 headerHtml += `</div></th>`;
             });
             headerHtml += `</tr>`;
-            thead.innerHTML = headerHtml;
+            safeSetHTML('control-thead', headerHtml);
 
-            // Pastikan filter reset ke default (Show All) saat diload pertama kali
             controlFilters = {};
             document.querySelectorAll('.filter-checkbox').forEach(cb => cb.addEventListener('change', (e) => updateCheckboxFilters(e.target.getAttribute('data-col-idx'))));
             document.querySelectorAll('.filter-input').forEach(input => input.addEventListener('input', (e) => { controlFilters[e.target.getAttribute('data-col')] = e.target.value.toLowerCase(); renderControlOutstanding(); }));
             
-            // JANGAN lakukan simulasi updateCheckboxFilters di sini karena akan membuat data tersembunyi
-            // Cukup panggil render
             renderControlOutstanding();
         }
 
         function renderControlOutstanding() {
-            const tbody = document.getElementById('control-tbody');
-            
             let displayHeaders = targetColumnsDB.filter(col => {
                 return masterHeaders.includes(col) || col === 'STATUS';
             });
             if (displayHeaders.length < 3) displayHeaders = targetColumnsDB; 
 
             let filteredData = globalMasterData.filter(row => {
-                // Filter Tab Periode
                 if (activePeriodeTab !== 'ALL') {
                     let rPer = String(row['PERIODE'] || '').trim();
                     if (rPer !== activePeriodeTab) return false;
                 }
-
-                // Filter Kolom Mutlak
                 return displayHeaders.every(col => {
                     let filterVal = controlFilters[col];
                     if (filterVal === undefined || filterVal === '') return true; 
@@ -1885,7 +2027,6 @@
                 });
             });
 
-            // Auto-sort berdasarkan STWC (Terlama ke Terbaru)
             filteredData.sort((a, b) => {
                 let tA = parseIndoDate(a['STWC']);
                 let tB = parseIndoDate(b['STWC']);
@@ -1896,8 +2037,6 @@
 
             let displayLimit = 300; let htmlString = "";
             filteredData.slice(0, displayLimit).forEach((row, idx) => {
-                let rowColor = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
-                
                 let bgClass = ''; let badge = '';
                 if(row._status === 'CLOSED') { bgClass = 'bg-emerald-50'; badge = `<span class="bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">CLOSED PP</span>`; }
                 else if(row._status === 'CND 3') { bgClass = 'bg-red-50'; badge = `<span class="bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded animate-pulse shadow-sm">CND 3</span>`; }
@@ -1916,7 +2055,7 @@
                 htmlString += `</tr>`;
             });
 
-            tbody.innerHTML = htmlString;
+            safeSetHTML('control-tbody', htmlString);
             safeSetText('control-counter', filteredData.length > displayLimit ? `Preview ${displayLimit}/${filteredData.length} Baris` : `Total ${filteredData.length} Baris`);
         }
 
@@ -1952,8 +2091,7 @@
         }
 
         function renderShMaterials() {
-            const container = document.getElementById('sh-cards-container');
-            if(globalShMaterials.length === 0) { container.innerHTML = `<div class="text-gray-400 text-center col-span-full mt-4">Belum ada data SH Material.</div>`; return; }
+            if(globalShMaterials.length === 0) { safeSetHTML('sh-cards-container', `<div class="text-gray-400 text-center col-span-full mt-4">Belum ada data SH Material.</div>`); return; }
             let html = '';
             globalShMaterials.forEach(sh => {
                 let isDatang = sh.tanggalKedatangan !== null;
@@ -1975,7 +2113,7 @@
                     </div>
                 `;
             });
-            container.innerHTML = html;
+            safeSetHTML('sh-cards-container', html);
             lucide.createIcons();
         }
 

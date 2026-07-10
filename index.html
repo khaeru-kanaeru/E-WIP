@@ -8,7 +8,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- SheetJS (Excel Parser) -->
+    <!-- SheetJS (Excel Parser & Exporter) -->
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 
     <!-- Lucide Icons -->
@@ -21,7 +21,7 @@
     <!-- HTML2Canvas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <!-- FIREBASE SDK (Compat Version for Easy Integration) -->
+    <!-- FIREBASE SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
@@ -98,7 +98,7 @@
         </div>
     </div>
 
-    <!-- Drilldown Modal (List Assy Chart Click) -->
+    <!-- Drilldown Modal -->
     <div id="drilldown-modal" class="fixed inset-0 bg-gray-900/80 z-[9999] hidden flex flex-col items-center justify-center p-4 lg:p-10 backdrop-blur-sm transition-opacity">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-200">
             <div class="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
@@ -109,12 +109,15 @@
                         <span id="drilldown-subtitle" class="text-xs text-brand-600 font-bold bg-brand-50 px-2 py-0.5 rounded mt-1 inline-block">Detailed View</span>
                     </div>
                 </div>
-                <button onclick="closeDrilldown()" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <div class="flex items-center gap-2">
+                    <button onclick="exportDrilldownXLSX()" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md text-[10px] font-bold shadow transition"><i data-lucide="download" class="w-3.5 h-3.5"></i> Export Excel</button>
+                    <button onclick="closeDrilldown()" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
             </div>
             <div class="flex-1 overflow-auto p-0 bg-white">
-                <table class="excel-table w-full whitespace-nowrap">
-                    <thead class="sticky top-0 shadow-sm z-10">
-                        <tr><th class="w-20">STATUS</th><th class="text-left w-48">ASSY NO</th><th class="w-24 text-left">WP</th><th class="w-24 text-center">STWC</th><th class="w-20 text-center">QTY</th><th class="w-20 text-center">TOTAL CCT</th><th class="text-left">CUSTOMER</th></tr>
+                <table class="excel-table w-full whitespace-nowrap" id="drilldown-table-export">
+                    <thead class="sticky top-0 shadow-sm z-10 bg-white">
+                        <tr><th class="w-20">STATUS</th><th class="text-left w-48">ASSY NO</th><th class="w-24 text-left">WP</th><th class="w-24 text-center">STWC</th><th class="w-20 text-center">QTY</th><th class="w-20 text-center text-purple-700">QTY CCT</th><th class="w-20 text-center">TOTAL CCT</th><th class="text-left">CUSTOMER</th></tr>
                     </thead>
                     <tbody id="drilldown-tbody" class="divide-y divide-gray-100"></tbody>
                 </table>
@@ -193,13 +196,13 @@
 
                 <!-- KPI CARDS -->
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3 shrink-0">
-                    <div class="bento-box p-4 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white relative overflow-hidden shadow-lg border-none">
+                    <div class="bento-box p-4 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white relative overflow-hidden shadow-lg border-none cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('TOP_KPI', 'ALL')">
                         <i data-lucide="layers" class="w-20 h-20 absolute -right-4 -bottom-4 opacity-20"></i>
                         <h3 class="text-[10px] font-bold uppercase tracking-widest text-indigo-100 mb-1">Total List Assy</h3>
                         <div id="ov-master-total" class="text-3xl font-black">0</div>
                         <p class="text-[9px] text-indigo-200 mt-1">Database Valid (Atas Cut-Off)</p>
                     </div>
-                    <div class="bento-box p-4 border-l-[5px] border-l-brand-500 bg-brand-50/40">
+                    <div class="bento-box p-4 border-l-[5px] border-l-brand-500 bg-brand-50/40 cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('TOP_KPI', 'OPEN')">
                         <div class="flex justify-between items-start mb-1">
                             <h3 class="text-[10px] font-bold uppercase tracking-widest text-brand-700">On Schedule</h3>
                             <i data-lucide="clock" class="w-4 h-4 text-brand-500 opacity-70"></i>
@@ -207,7 +210,7 @@
                         <div id="ov-master-onsched" class="text-3xl font-black text-gray-800 tracking-tight">0</div>
                         <p class="text-[9px] text-gray-500 mt-1">Sesuai rentang STWC (Aman)</p>
                     </div>
-                    <div class="bento-box p-4 border-l-[5px] border-l-amber-400 bg-amber-50/40">
+                    <div class="bento-box p-4 border-l-[5px] border-l-amber-400 bg-amber-50/40 cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('TOP_KPI', 'CND 2')">
                         <div class="flex justify-between items-start mb-1">
                             <h3 class="text-[10px] font-bold uppercase tracking-widest text-amber-700">Warning (CND 2)</h3>
                             <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 opacity-70"></i>
@@ -215,7 +218,7 @@
                         <div id="ov-master-cnd2" class="text-3xl font-black text-gray-800 tracking-tight">0</div>
                         <p class="text-[9px] text-gray-500 mt-1">STWC terlewat H+1 Hari</p>
                     </div>
-                    <div class="bento-box p-4 border-l-[5px] border-l-red-500 bg-red-50/40">
+                    <div class="bento-box p-4 border-l-[5px] border-l-red-500 bg-red-50/40 cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('TOP_KPI', 'CND 3')">
                         <div class="flex justify-between items-start mb-1">
                             <h3 class="text-[10px] font-bold uppercase tracking-widest text-red-700">Overdue (CND 3)</h3>
                             <i data-lucide="alert-octagon" class="w-4 h-4 text-red-500 opacity-70"></i>
@@ -223,7 +226,7 @@
                         <div id="ov-master-cnd3" class="text-3xl font-black text-gray-800 tracking-tight">0</div>
                         <p class="text-[9px] text-gray-500 mt-1">STWC terlewat ≥ H+2 Hari</p>
                     </div>
-                    <div class="bento-box p-4 border-l-[5px] border-l-emerald-500 bg-emerald-50/40">
+                    <div class="bento-box p-4 border-l-[5px] border-l-emerald-500 bg-emerald-50/40 cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('TOP_KPI', 'CLOSED')">
                         <div class="flex justify-between items-start mb-1">
                             <h3 class="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Closed (Finish)</h3>
                             <i data-lucide="check-circle" class="w-4 h-4 text-emerald-500 opacity-70"></i>
@@ -282,19 +285,19 @@
                     </div>
 
                     <div class="flex flex-wrap lg:flex-nowrap gap-4 mb-5 shrink-0">
-                        <div class="flex-1 flex flex-col bg-gray-50 border border-gray-200 px-5 py-3 rounded-xl shadow-sm">
+                        <div class="flex-1 flex flex-col bg-gray-50 border border-gray-200 px-5 py-3 rounded-xl shadow-sm cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('MID_KPI', 'ALL')">
                             <span class="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Total Load Aktif</span>
                             <span id="ov-kpi-load" class="text-3xl font-black text-gray-800">0</span>
                         </div>
-                        <div class="flex-1 flex flex-col bg-blue-50 border border-blue-200 px-5 py-3 rounded-xl shadow-sm">
+                        <div class="flex-1 flex flex-col bg-blue-50 border border-blue-200 px-5 py-3 rounded-xl shadow-sm cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('MID_KPI', 'ONSCHED')">
                             <span class="text-[11px] text-blue-600 font-bold uppercase tracking-wider mb-1">On Schedule</span>
                             <span id="ov-kpi-onsched" class="text-3xl font-black text-blue-700">0</span>
                         </div>
-                        <div class="flex-1 flex flex-col bg-red-50 border border-red-200 px-5 py-3 rounded-xl shadow-sm">
+                        <div class="flex-1 flex flex-col bg-red-50 border border-red-200 px-5 py-3 rounded-xl shadow-sm cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('MID_KPI', 'DELAY')">
                             <span class="text-[11px] text-red-600 font-bold uppercase tracking-wider mb-1">Total Delay</span>
                             <span id="ov-kpi-delay" class="text-3xl font-black text-red-700">0</span>
                         </div>
-                        <div class="flex-1 flex flex-col bg-amber-50 border border-amber-200 px-5 py-3 rounded-xl shadow-sm">
+                        <div class="flex-1 flex flex-col bg-amber-50 border border-amber-200 px-5 py-3 rounded-xl shadow-sm cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('MID_KPI', 'SH')">
                             <span class="text-[11px] text-amber-600 font-bold uppercase tracking-wider mb-1">Shortage (SH)</span>
                             <span id="ov-kpi-sh" class="text-3xl font-black text-amber-700">0</span>
                         </div>
@@ -302,9 +305,7 @@
                 </div>
 
                 <!-- DYNAMIC CHARTS CONTAINER -->
-                <div id="overview-charts-container" class="flex flex-col gap-5 shrink-0">
-                    <!-- JS Injected: Big Chart Sections -->
-                </div>
+                <div id="overview-charts-container" class="flex flex-col gap-5 shrink-0"></div>
             </div>
         </section>
 
@@ -390,7 +391,10 @@
                         <div class="text-[14px] font-black text-gray-800 flex items-center gap-2 tracking-tight">
                             <i data-lucide="database" class="w-5 h-5 text-brand-500"></i> Database Bersih Tervalidasi
                         </div>
-                        <div id="control-counter" class="text-[10px] font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-100 shadow-sm"></div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="clearAllFilters()" class="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1 border border-red-200 rounded font-bold shadow-sm transition flex items-center gap-1"><i data-lucide="filter-x" class="w-3 h-3"></i> Clear All Filter</button>
+                            <div id="control-counter" class="text-[10px] font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-100 shadow-sm"></div>
+                        </div>
                     </div>
                     <div id="control-periode-tabs" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide"></div>
                 </div>
@@ -471,7 +475,7 @@
 
     <script>
         // ==========================================
-        // 1. FIREBASE WRAPPER LOGIC DENGAN CHUNKING (ATOMIC WRITE & THROTTLED)
+        // 1. FIREBASE WRAPPER LOGIC DENGAN CHUNKING (SEKUENSIAL & THROTTLED)
         // ==========================================
         
         // KONFIGURASI FIREBASE ANDA
@@ -530,14 +534,14 @@
                     await new Promise(resolve => setTimeout(resolve, 400));
                 }
 
-                let retriesMeta = 3;
-                while(retriesMeta > 0) {
+                let retriesMetaEnd = 3;
+                while(retriesMetaEnd > 0) {
                     try {
                         await db.collection("wip_dashboard").doc(key + "_meta").set({ chunks: chunksCount, runId: runId });
                         break;
                     } catch(e) {
-                        retriesMeta--;
-                        if(retriesMeta === 0) throw e;
+                        retriesMetaEnd--;
+                        if(retriesMetaEnd === 0) throw e;
                         await new Promise(r => setTimeout(r, 1000));
                     }
                 }
@@ -617,6 +621,33 @@
         
         const CATEGORIES = ['ADD', 'CAT', 'REG', 'SMC', 'SMV'];
         const dateKeywords = ['STWC', 'TANGGAL', 'DATE', 'HOUSING', 'ASSEMBLING', 'VISUAL', 'CHECKER', 'FINISHING', 'PREDEL', 'RFG'];
+
+        // FUNGSI STATISTIK (ELIMINASI OUTLIER QTY)
+        function getAvgQtyOutlierEliminated(qtyArray) {
+            let valid = qtyArray.map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+            if(valid.length === 0) return 0;
+            if(valid.length < 3) return Math.round(valid.reduce((a,b)=>a+b,0)/valid.length);
+            let mean = valid.reduce((a,b)=>a+b,0)/valid.length;
+            let variance = valid.reduce((a,b)=>a + Math.pow(b-mean, 2), 0) / valid.length;
+            let stdDev = Math.sqrt(variance);
+            let filtered = valid.filter(v => v >= mean - stdDev && v <= mean + stdDev);
+            if(filtered.length === 0) return Math.round(mean);
+            return Math.round(filtered.reduce((a,b)=>a+b,0)/filtered.length);
+        }
+
+        // FUNGSI CLEAR FILTER & FILTER THIS ITEM ONLY
+        window.clearColumnFilter = function(colName) {
+            delete controlFilters[colName]; setupControlHeaders(); 
+        };
+        window.clearAllFilters = function() {
+            controlFilters = {}; activePeriodeTab = 'ALL'; setupControlHeaders();
+        };
+        window.filterThisItemOnly = function(colIdx, val, colName) {
+            document.querySelectorAll(`.filter-checkbox[data-col-idx="${colIdx}"]`).forEach(cb => cb.checked = false);
+            let targetCb = document.querySelector(`.filter-checkbox[data-col-idx="${colIdx}"][value="${val.replace(/"/g, '&quot;')}"]`);
+            if(targetCb) targetCb.checked = true;
+            updateCheckboxFilters(colIdx);
+        };
 
         // CHART PLUGIN: BACKGROUND AREA DELAY UNTUK VISUALISASI OUTSTANDING
         const thresholdBgPlugin = {
@@ -1159,6 +1190,42 @@
                             let existingIdx = globalWipData.findIndex(w => w._uid === uid);
                             if(existingIdx !== -1) globalWipData[existingIdx] = obj;
                             else globalWipData.push(obj);
+
+                            // AUTO-INSERT KE DATABASE BERSIH DENGAN KALKULASI STWC PREDIKTIF CERDAS
+                            let masterIdx = globalMasterData.findIndex(m => m._uid === uid);
+                            if(masterIdx === -1) {
+                                let newMasterObj = { ...obj, _status: 'OPEN', 'TOTAL CCT': obj['PP CCT'] || 0 };
+                                let wpPrefix = getWPP(wpStr); // Mengambil 2 digit awal WP (WPP)
+                                
+                                // 1. Cek apakah 2 digit WPP ini sudah pernah ada di periode yang sama
+                                let wppMatches = globalMasterData.filter(m => m.PERIODE === perStr && getWPP(String(m.WP || '').trim()) === wpPrefix);
+                                
+                                if (wppMatches.length > 0 && wppMatches[0].STWC) {
+                                    // Jika ada, MUTLAK samakan STWC-nya
+                                    newMasterObj.STWC = wppMatches[0].STWC;
+                                } else {
+                                    // 2. Jika WPP ini berbeda/baru di periode ini, cari H+2 dari STWC max di PERIODE tersebut
+                                    let periodeMatches = globalMasterData.filter(m => m.PERIODE === perStr);
+                                    let periodeSTWCs = periodeMatches.map(m => parseIndoDate(m.STWC)).filter(t => t > 0);
+                                    
+                                    if (periodeSTWCs.length > 0) {
+                                        let maxTime = Math.max(...periodeSTWCs);
+                                        let d = new Date(maxTime + (2 * 86400000)); // Tambah 2 Hari dari STWC Terakhir Periode Ini
+                                        newMasterObj.STWC = String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+                                    } else {
+                                        // 3. Fallback jika ini adalah list benar-benar pertama di tahun/periode tersebut
+                                        let allSTWCs = globalMasterData.map(m => parseIndoDate(m.STWC)).filter(t => t > 0);
+                                        if(allSTWCs.length > 0) {
+                                            let maxTime = Math.max(...allSTWCs);
+                                            let d = new Date(maxTime + (2 * 86400000));
+                                            newMasterObj.STWC = String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+                                        } else {
+                                            newMasterObj.STWC = getTodayDateStr().split('-').reverse().join('-');
+                                        }
+                                    }
+                                }
+                                globalMasterData.push(newMasterObj);
+                            }
                         }
                     } else { showToast(`Format File WIP Salah: ${file.name}`, 'error'); }
                 } catch(err) { console.error(err); showToast(`Error WIP ${file.name}`, 'error'); }
@@ -1209,6 +1276,10 @@
         async function recalculateValidation() {
             if(!isFirebaseActive) return;
             if (globalMasterData.length === 0) return;
+
+            const overlay = document.getElementById('loading-overlay');
+            if(overlay) overlay.classList.remove('hidden');
+            setLoaderState('Menghitung Ulang...', 'Memvalidasi Tanggal', 50, '');
 
             let today = new Date(); today.setHours(0,0,0,0);
             let todayStr = getTodayDateStr();
@@ -1270,10 +1341,11 @@
                 await saveDB('master_data', globalMasterData);
                 await saveDB('daily_history', dailyHistory);
 
+                if(overlay) overlay.classList.add('hidden');
                 showToast('Rekalkulasi Validasi Mutlak Selesai.', 'success');
                 refreshDashboards();
                 try { renderControlOutstanding(); } catch(e){}
-            } catch(e) {}
+            } catch(e) { if(overlay) overlay.classList.add('hidden'); }
         }
 
         // Context Switcher logic
@@ -1285,6 +1357,12 @@
         function downloadOverviewImage() {
             const source = document.getElementById('view-overview-export-wrapper');
             if(!source) return;
+
+            setLoaderState('Menyiapkan Gambar...', 'Merender struktur grafik.', 50, ''); 
+            document.getElementById('loading-overlay').classList.remove('hidden');
+
+            const btns = document.getElementById('overview-export-buttons-hide');
+            if(btns) btns.style.display = 'none';
 
             // Kloning dashboard ke belakang layar
             const printBox = document.createElement('div');
@@ -1299,8 +1377,8 @@
             const clone = source.cloneNode(true);
             
             // Hapus tombol export pada kloningan agar tidak ikut terfoto dan MENCEGAH BUG KLIK MENEMBUS KE BAWAH
-            const btns = clone.querySelector('#overview-export-buttons-hide');
-            if(btns) btns.remove();
+            const cloneBtns = clone.querySelector('#overview-export-buttons-hide');
+            if(cloneBtns) cloneBtns.remove();
 
             // Memaksa mode desktop (Mencegah elemen bertumpuk karena zoom/layar kecil)
             clone.querySelectorAll('*').forEach(el => {
@@ -1356,71 +1434,223 @@
                 ctx.drawImage(canvas, 0, 0);
             });
 
-            showToast('Menyiapkan gambar High-Res...', 'info');
-
             setTimeout(() => {
                 html2canvas(printBox, { scale: 2, useCORS: true, backgroundColor: '#f4f5f7', logging: false }).then(canvas => {
                     document.body.removeChild(printBox);
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    if(btns) btns.style.display = 'flex';
                     const link = document.createElement('a'); link.download = `Dashboard_Executive_${new Date().toISOString().replace(/[:.]/g, '-')}.png`; link.href = canvas.toDataURL('image/png'); link.click();
                 }).catch(err => { 
                     document.body.removeChild(printBox); 
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    if(btns) btns.style.display = 'flex';
                     showToast('Gagal Export Dashboard', 'error'); 
                 });
-            }, 300);
+            }, 500);
         }
 
-        window.openDrilldownModal = function(pwKey, catName) {
+        window.exportDrilldownXLSX = function() {
+            if(!window.currentDrilldownData || window.currentDrilldownData.length === 0) {
+                showToast("Tidak ada data untuk diexport", "warning"); 
+                return;
+            }
+            const ws = XLSX.utils.json_to_sheet(window.currentDrilldownData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data");
+            
+            const titleEl = document.getElementById('drilldown-title');
+            const title = titleEl ? titleEl.innerText.replace(/[^a-zA-Z0-9 ]/g, "_") : "List_Assy";
+            XLSX.writeFile(wb, `${title}.xlsx`);
+        };
+
+        window.openAdvancedDrilldown = function(mode, param1, param2) {
             const modal = document.getElementById('drilldown-modal');
-            const title = document.getElementById('drilldown-title');
-            
-            let [per, wpp] = pwKey.split('_');
-            if(title) title.innerText = `List Assy - Periode ${per} | WPP ${wpp} (${catName})`;
-            
-            let wipMap = new Map();
-            globalWipData.forEach(w => wipMap.set(w._uid, w));
+            let filtered = []; let titleStr = "";
 
-            let filtered = globalMasterData.filter(m => {
-                if(m._status === 'CLOSED') return false; 
-                let mPer = String(m['PERIODE'] || '').trim();
-                let mWppStr = String(m['WP'] || '').trim();
-                let mWpp = getWPP(mWppStr);
-                let mCat = getCategoryName(mWppStr);
-                
-                if(mPer !== per || parseInt(mWpp) !== parseInt(wpp)) return false;
-                if(catName !== 'ALL' && catName !== 'GRAND' && mCat !== catName) return false;
-                return true;
-            });
+            let cutoffIndex = globalUniquePeriodeWPP.indexOf(globalCutoffPWKey); 
+            if(cutoffIndex === -1) cutoffIndex = 0;
+            let delayIndex = globalUniquePeriodeWPP.indexOf(globalDelayPWKey);
+            if(delayIndex === -1) delayIndex = 0;
 
-            filtered.sort((a,b) => {
-                let st = {'CND 3':1, 'CND 2':2, 'OPEN':3};
-                return (st[a._status] || 99) - (st[b._status] || 99);
-            });
+            let wipMap = new Map(); globalWipData.forEach(w => wipMap.set(w._uid, w));
+
+            if(mode === 'TOP_KPI') {
+                titleStr = `List Assy - Filter Status: ${param1}`;
+                filtered = globalMasterData.filter(m => {
+                    if (param1 === 'ALL') return m._status !== 'CLOSED';
+                    if (m._status !== param1) return false;
+                    if(activeOverviewCat !== 'ALL') return getCategoryName(m['WP']) === activeOverviewCat;
+                    return true;
+                });
+            }
+            else if (mode === 'MID_KPI') {
+                titleStr = `List Assy - Analisis Loading: ${param1} (${activeOverviewCat})`;
+                filtered = globalMasterData.filter(m => {
+                    if(m._status === 'CLOSED') return false;
+                    let mCat = getCategoryName(m['WP']);
+                    if(activeOverviewCat !== 'ALL' && mCat !== activeOverviewCat) return false;
+                    
+                    let pwKey = (m['PERIODE'] || '-') + '_' + getWPP(String(m['WP'] || '').trim());
+                    let wppIndex = globalUniquePeriodeWPP.indexOf(pwKey);
+                    if(wppIndex !== -1 && wppIndex < cutoffIndex) return false;
+
+                    let w = wipMap.get(m._uid);
+                    let isSHInSystem = globalShMaterials.some(sh => String(sh.wp).toUpperCase() === String(m['WP']||'').toUpperCase());
+                    let problemStrRaw = w ? Object.keys(w).find(k => k.includes('KETERANGAN') || k.includes('PROBLEM') || k.includes('POTENSI')) : null;
+                    let isPotensiSH = problemStrRaw ? String(w[problemStrRaw]).toUpperCase().includes('SH') : false;
+                    let isSH = isSHInSystem || isPotensiSH;
+                    let isDelay = wppIndex < delayIndex;
+
+                    if (param1 === 'ALL') return true;
+                    if (param1 === 'SH') return isSH;
+                    if (param1 === 'DELAY') return !isSH && isDelay;
+                    if (param1 === 'ONSCHED') return !isSH && !isDelay;
+                    return false;
+                });
+            }
+            else if(mode === 'WPP') {
+                let [per, wpp] = param1.split('_');
+                titleStr = `List Assy - WPP ${per} - ${wpp} (${param2})`;
+                filtered = globalMasterData.filter(m => {
+                    if(m._status === 'CLOSED') return false;
+                    let mPer = String(m['PERIODE'] || '').trim();
+                    let mWppStr = String(m['WP'] || '').trim();
+                    if(mPer !== per || parseInt(getWPP(mWppStr)) !== parseInt(wpp)) return false;
+                    if(param2 !== 'ALL' && param2 !== 'GRAND' && getCategoryName(mWppStr) !== param2) return false;
+                    return true;
+                });
+            }
+            else if(mode === 'PIE_LEGEND') {
+                titleStr = `List Assy - Kategori ${param2} (${param1})`;
+                filtered = globalMasterData.filter(m => {
+                    if(m._status === 'CLOSED') return false;
+                    let mCat = getCategoryName(m['WP']);
+                    if(param2 !== 'ALL' && param2 !== 'GRAND' && mCat !== param2) return false;
+
+                    let pwKey = (m['PERIODE'] || '-') + '_' + getWPP(String(m['WP'] || '').trim());
+                    let wppIndex = globalUniquePeriodeWPP.indexOf(pwKey);
+                    if(wppIndex !== -1 && wppIndex < cutoffIndex) return false;
+
+                    let w = wipMap.get(m._uid);
+                    let isSHInSystem = globalShMaterials.some(sh => String(sh.wp).toUpperCase() === String(m['WP']||'').toUpperCase());
+                    let problemStrRaw = w ? Object.keys(w).find(k => k.includes('KETERANGAN') || k.includes('PROBLEM') || k.includes('POTENSI')) : null;
+                    let isPotensiSH = problemStrRaw ? String(w[problemStrRaw]).toUpperCase().includes('SH') : false;
+                    let isSH = isSHInSystem || isPotensiSH;
+                    let isDelay = wppIndex < delayIndex;
+
+                    if (param1 === 'SH') return isSH;
+                    if (param1 === 'DELAY') return !isSH && isDelay;
+                    if (param1 === 'ONSCHED') return !isSH && !isDelay;
+                    return true;
+                });
+            }
+            else if(mode === 'LEGEND') {
+                titleStr = `List Assy - Semua Status (${param1})`;
+                filtered = globalMasterData.filter(m => {
+                    if(m._status === 'CLOSED') return false;
+                    if(param1 !== 'ALL' && param1 !== 'GRAND' && getCategoryName(m['WP']) !== param1) return false;
+                    return true;
+                });
+            }
+            else if (mode === 'SINGLE') {
+                let m = globalMasterData.find(x => x._uid === param1);
+                if(m) {
+                    filtered = [m];
+                    titleStr = `Detail Assy: ${m.ASSY}`;
+                }
+            }
+
+            filtered.sort((a,b) => parseIndoDate(a['STWC']) - parseIndoDate(b['STWC']));
 
             let totalList = filtered.length;
-            let totalCct = filtered.reduce((sum, m) => {
-                let w = wipMap.get(m._uid);
-                let val = w && w['PP CCT'] ? parseFloat(w['PP CCT']) : parseFloat(m['TOTAL CCT']);
-                return sum + (val || 0);
-            }, 0);
-            
-            safeSetHTML('drilldown-subtitle', `Total List Assy: <strong class="text-gray-800">${totalList}</strong> &nbsp;|&nbsp; Total CCT Aktual: <strong class="text-gray-800">${totalCct.toLocaleString()}</strong>`);
+            let qtyArr = []; let totalCct = 0;
 
             let html = '';
+            window.currentDrilldownData = [];
+
             filtered.forEach(m => {
                 let badge = m._status === 'CND 3' ? '<span class="bg-red-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CND 3</span>' : 
                             m._status === 'CND 2' ? '<span class="bg-amber-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CND 2</span>' :
-                            '<span class="bg-blue-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">OPEN</span>';
+                            (m._status === 'CLOSED' ? '<span class="bg-emerald-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">CLOSED</span>' : '<span class="bg-blue-500 text-white px-2 py-0.5 rounded font-bold text-[9px] shadow-sm">OPEN</span>');
                 
                 let w = wipMap.get(m._uid);
-                let cctDisplay = w && w['PP CCT'] ? w['PP CCT'] : (m['TOTAL CCT'] || '-');
+                let cctDisplay = w && w['PP CCT'] ? parseFloat(w['PP CCT']) : parseFloat(m['TOTAL CCT'] || 0);
+                
+                // Prioritaskan nilai PP harian dari file WIP, jika tidak ada, gunakan QTY Master
+                let qtyDisplay = w && w['PP'] ? parseFloat(w['PP']) : parseFloat(m['QTY'] || m['PP'] || 0);
+                let qtyCctDisplay = parseFloat(m['CCT'] || m['QTY CCT'] || 0);
+                
+                totalCct += cctDisplay; if(qtyDisplay > 0) qtyArr.push(qtyDisplay);
 
-                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition"><td class="p-2.5 text-center">${badge}</td><td class="p-2.5 font-bold text-gray-800">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500">${m.WP||'-'}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center">${m.QTY||'-'}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${cctDisplay}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px]">${m.CUSTOMER||'-'}</td></tr>`;
+                window.currentDrilldownData.push({
+                    "STATUS": m._status,
+                    "ASSY NO": m.ASSY || '-',
+                    "WP": m.WP || '-',
+                    "STWC": m.STWC || '-',
+                    "QTY": qtyDisplay,
+                    "QTY CCT": qtyCctDisplay,
+                    "TOTAL CCT": cctDisplay,
+                    "CUSTOMER": m.CUSTOMER || '-'
+                });
+
+                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition drill-row"><td class="p-2.5 text-center stat-cell">${badge}</td><td class="p-2.5 font-bold text-gray-800 assy-cell">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500 wp-cell">${m.WP||'-'}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center text-indigo-700 font-bold">${qtyDisplay}</td><td class="p-2.5 text-center text-purple-600 font-bold">${qtyCctDisplay}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${cctDisplay}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px] cust-cell">${m.CUSTOMER||'-'}</td></tr>`;
             });
             
-            if(filtered.length === 0) html = '<tr><td colspan="7" class="text-center p-6 text-gray-400 font-medium">Tidak ada data aktif di WPP ini.</td></tr>';
+            if(filtered.length === 0) html = '<tr><td colspan="8" class="text-center p-6 text-gray-400 font-medium">Tidak ada data aktif.</td></tr>';
             
+            if (mode === 'SINGLE' && filtered.length > 0) {
+                 let m = filtered[0];
+                 let today = new Date(); today.setHours(0,0,0,0);
+                 let stwcTime = parseIndoDate(m['STWC']);
+                 let overdueText = "";
+                 
+                 if(m._status !== 'CLOSED' && stwcTime > 0) {
+                     let diffDays = Math.round((today.getTime() - stwcTime) / 86400000);
+                     if(diffDays > 0) overdueText = `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded ml-2 text-xs font-bold shadow-sm animate-pulse">⚠️ Terlambat ${diffDays} Hari dari STWC</span>`;
+                     else overdueText = `<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded ml-2 text-xs font-bold shadow-sm">⏳ On Schedule (Aman)</span>`;
+                 } else if(m._status === 'CLOSED') {
+                     overdueText = `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded ml-2 text-xs font-bold shadow-sm">✅ Telah Selesai (Closed)</span>`;
+                 }
+                 safeSetHTML('drilldown-subtitle', `Periode: <strong class="text-gray-800">${m.PERIODE||'-'}</strong> &nbsp;|&nbsp; WPP: <strong class="text-gray-800">${getWPP(m.WP||'-')}</strong> ${overdueText}`);
+            } else {
+                 let avgQty = getAvgQtyOutlierEliminated(qtyArr);
+                 safeSetHTML('drilldown-subtitle', `Total List: <strong class="text-gray-800">${totalList}</strong> &nbsp;|&nbsp; Total QTY Aktual: <strong class="text-indigo-700">${qtyArr.reduce((a,b)=>a+b,0).toLocaleString()}</strong> &nbsp;|&nbsp; Rata-rata QTY (Normalisasi): <strong class="text-indigo-700">${avgQty.toLocaleString()}</strong>`);
+            }
+            
+            safeSetText('drilldown-title', titleStr);
             safeSetHTML('drilldown-tbody', html);
+
+            // Pasang Header Pencarian Dinamis (Termasuk Kolom Baru QTY CCT)
+            const thead = document.querySelector('#drilldown-modal thead');
+            if(thead) {
+                const oldFilterRow = thead.querySelector('.modal-filter-row');
+                if(oldFilterRow) oldFilterRow.remove();
+
+                let filterRow = document.createElement('tr');
+                filterRow.className = 'modal-filter-row bg-gray-50 border-t border-gray-200';
+                filterRow.innerHTML = `
+                    <th class="p-1"><input type="text" placeholder="Filter..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(0, this.value)"></th>
+                    <th class="p-1"><input type="text" placeholder="Cari Assy..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(1, this.value)"></th>
+                    <th class="p-1"><input type="text" placeholder="Cari WP..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(2, this.value)"></th>
+                    <th></th><th></th><th></th><th></th>
+                    <th class="p-1"><input type="text" placeholder="Cari Customer..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(7, this.value)"></th>
+                `;
+                thead.appendChild(filterRow);
+            }
+
             if(modal) modal.classList.remove('hidden');
+        }
+
+        window.filterDrillTable = function(colIdx, val) {
+            let filter = val.toUpperCase();
+            let rows = document.querySelectorAll('.drill-row');
+            rows.forEach(r => {
+                let cell = r.getElementsByTagName('td')[colIdx];
+                if(cell) {
+                    let txt = cell.textContent || cell.innerText;
+                    r.style.display = txt.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+                }
+            });
         }
 
         window.closeDrilldown = function() {
@@ -1527,7 +1757,7 @@
                 else {
                     let logHtml = '';
                     closedToday.forEach(m => {
-                        logHtml += `<div class="p-1.5 border border-emerald-100 rounded bg-emerald-50 text-[9px] flex justify-between items-center transition hover:bg-emerald-100/50"><span class="font-bold text-gray-800">${m['ASSY'] || '-'} <span class="text-emerald-600 font-normal ml-1">(${m['PERIODE']||'-'} | ${m['WP'] || '-'})</span></span><span class="text-emerald-700 font-bold">${m._closedDate || todayStr}</span></div>`;
+                        logHtml += `<div onclick="openAdvancedDrilldown('SINGLE', '${m._uid}')" class="p-1.5 border border-emerald-100 rounded bg-emerald-50 text-[9px] flex justify-between items-center transition hover:bg-emerald-200 cursor-pointer shadow-sm hover:shadow hover:scale-[1.01]"><span class="font-bold text-gray-800">${m['ASSY'] || '-'} <span class="text-emerald-600 font-normal ml-1">(${m['PERIODE']||'-'} | ${m['WP'] || '-'})</span></span><span class="text-emerald-700 font-bold">${m._closedDate || todayStr}</span></div>`;
                     });
                     listEl.innerHTML = logHtml;
                 }
@@ -1543,14 +1773,20 @@
                         let isCnd3 = m._status === 'CND 3';
                         let bg = isCnd3 ? 'bg-red-50 border-red-100 text-red-600' : 'bg-amber-50 border-amber-100 text-amber-600';
                         let tColor = isCnd3 ? 'text-red-500' : 'text-amber-500';
-                        logHtml += `<div class="p-1.5 border rounded ${bg} text-[9px] flex justify-between items-center transition hover:opacity-80"><span class="font-bold text-gray-800">${m['ASSY'] || '-'} <span class="${tColor} font-normal ml-1">(${m['PERIODE']||'-'} | ${m['WP']||'-'})</span></span><span class="font-bold font-mono">${m['STWC'] || '-'}</span></div>`;
+                        logHtml += `<div onclick="openAdvancedDrilldown('SINGLE', '${m._uid}')" class="p-1.5 border rounded ${bg} text-[9px] flex justify-between items-center transition hover:opacity-80 cursor-pointer shadow-sm hover:shadow hover:scale-[1.01]"><span class="font-bold text-gray-800">${m['ASSY'] || '-'} <span class="${tColor} font-normal ml-1">(${m['PERIODE']||'-'} | ${m['WP']||'-'})</span></span><span class="font-bold font-mono">${m['STWC'] || '-'}</span></div>`;
                     });
                     listOverdueEl.innerHTML = logHtml;
                 }
             }
 
             let wppSums = {}; let catSums = { ADD:{}, CAT:{}, REG:{}, SMC:{}, SMV:{} };
-            let catStats = { ADD: {load:0, delay:0, onsched:0, sh:0}, CAT: {load:0, delay:0, onsched:0, sh:0}, REG: {load:0, delay:0, onsched:0, sh:0}, SMC: {load:0, delay:0, onsched:0, sh:0}, SMV: {load:0, delay:0, onsched:0, sh:0} };
+            let catStats = { 
+                ADD: {load:0, delay:0, onsched:0, sh:0, count_delay:0, count_onsched:0, count_sh:0, qtyArr_delay:[], qtyArr_onsched:[], qtyArr_sh:[], avg_delay:0, avg_onsched:0, avg_sh:0}, 
+                CAT: {load:0, delay:0, onsched:0, sh:0, count_delay:0, count_onsched:0, count_sh:0, qtyArr_delay:[], qtyArr_onsched:[], qtyArr_sh:[], avg_delay:0, avg_onsched:0, avg_sh:0}, 
+                REG: {load:0, delay:0, onsched:0, sh:0, count_delay:0, count_onsched:0, count_sh:0, qtyArr_delay:[], qtyArr_onsched:[], qtyArr_sh:[], avg_delay:0, avg_onsched:0, avg_sh:0}, 
+                SMC: {load:0, delay:0, onsched:0, sh:0, count_delay:0, count_onsched:0, count_sh:0, qtyArr_delay:[], qtyArr_onsched:[], qtyArr_sh:[], avg_delay:0, avg_onsched:0, avg_sh:0}, 
+                SMV: {load:0, delay:0, onsched:0, sh:0, count_delay:0, count_onsched:0, count_sh:0, qtyArr_delay:[], qtyArr_onsched:[], qtyArr_sh:[], avg_delay:0, avg_onsched:0, avg_sh:0} 
+            };
             let kpiTotalLoad = 0; let kpiDelay = 0; let kpiOnSched = 0; let kpiSH = 0;
             let stackedData = { grand: { sched: [], delay: [], sh: [] }, add: { sched: [], delay: [], sh: [] }, cat: { sched: [], delay: [], sh: [] }, reg: { sched: [], delay: [], sh: [] }, smc: { sched: [], delay: [], sh: [] }, smv: { sched: [], delay: [], sh: [] } };
 
@@ -1561,22 +1797,28 @@
                     CATEGORIES.forEach(cat => { stackedData[cat.toLowerCase()].sched.push(0); stackedData[cat.toLowerCase()].delay.push(0); stackedData[cat.toLowerCase()].sh.push(0); });
                 });
 
-                globalWipData.forEach(row => {
-                    const wpRaw = String(row['WP'] || '-').trim(); const pwKey = (row['PERIODE'] || '-') + '_' + getWPP(wpRaw);
-                    const ppCct = parseFloat(row['PP CCT']) || 0; const wpCat = getCategoryName(wpRaw);
-                    let catKey = CATEGORIES.includes(wpCat) ? wpCat : null;
-                    const wppIndex = globalUniquePeriodeWPP.indexOf(pwKey);
-                    
+                let wipMap = new Map(); globalWipData.forEach(w => wipMap.set(w._uid, w));
+
+                globalMasterData.forEach(m => {
+                    if(m._status === 'CLOSED') return;
+                    let pwKey = (m['PERIODE'] || '-') + '_' + getWPP(String(m['WP'] || '').trim());
+                    let wppIndex = globalUniquePeriodeWPP.indexOf(pwKey);
                     if (wppIndex !== -1 && wppIndex < cutoffIndex) return; 
 
-                    const isDelay = wppIndex < delayIndex; 
+                    let w = wipMap.get(m._uid);
+                    if(!w) return;
 
-                    let isSHInSystem = globalShMaterials.some(sh => String(sh.wp).toUpperCase() === wpRaw.toUpperCase());
-                    let problemStrRaw = Object.keys(row).find(k => k.includes('KETERANGAN') || k.includes('PROBLEM') || k.includes('POTENSI'));
-                    let isPotensiSH = problemStrRaw ? String(row[problemStrRaw]).toUpperCase().includes('SH') : false;
+                    const ppCct = parseFloat(w['PP CCT']) || 0; 
+                    const qtyDisplay = w['PP'] ? parseFloat(w['PP']) : parseFloat(m['QTY'] || 0); // PREFER QTY FROM WIP
+                    const wpCat = getCategoryName(m['WP']);
+                    let catKey = CATEGORIES.includes(wpCat) ? wpCat : null;
+
+                    const isDelay = wppIndex < delayIndex; 
+                    let isSHInSystem = globalShMaterials.some(sh => String(sh.wp).toUpperCase() === String(m['WP']||'').toUpperCase());
+                    let problemStrRaw = Object.keys(w).find(k => k.includes('KETERANGAN') || k.includes('PROBLEM') || k.includes('POTENSI'));
+                    let isPotensiSH = problemStrRaw ? String(w[problemStrRaw]).toUpperCase().includes('SH') : false;
                     let isSH = isSHInSystem || isPotensiSH;
 
-                    // Aggregate Data berdasarkan filter kategori (Atas)
                     if (activeOverviewCat === 'ALL' || activeOverviewCat === catKey) {
                         kpiTotalLoad += ppCct; 
                         if(isSH) kpiSH += ppCct; else if(isDelay) kpiDelay += ppCct; else kpiOnSched += ppCct;
@@ -1589,7 +1831,16 @@
                     
                     if(catKey) { 
                         catStats[catKey].load += ppCct; 
-                        if(isSH) catStats[catKey].sh += ppCct; else if(isDelay) catStats[catKey].delay += ppCct; else catStats[catKey].onsched += ppCct; 
+                        if(isSH) {
+                            catStats[catKey].sh += ppCct; catStats[catKey].count_sh++;
+                            if(qtyDisplay > 0) catStats[catKey].qtyArr_sh.push(qtyDisplay);
+                        } else if(isDelay) {
+                            catStats[catKey].delay += ppCct; catStats[catKey].count_delay++;
+                            if(qtyDisplay > 0) catStats[catKey].qtyArr_delay.push(qtyDisplay);
+                        } else {
+                            catStats[catKey].onsched += ppCct; catStats[catKey].count_onsched++;
+                            if(qtyDisplay > 0) catStats[catKey].qtyArr_onsched.push(qtyDisplay);
+                        }
                     }
                     
                     if(catKey && catSums[catKey][pwKey] !== undefined) {
@@ -1600,7 +1851,12 @@
                     }
                 });
 
-                // UPDATE MEMORY HISTORY
+                CATEGORIES.forEach(c => {
+                    catStats[c].avg_sh = getAvgQtyOutlierEliminated(catStats[c].qtyArr_sh);
+                    catStats[c].avg_delay = getAvgQtyOutlierEliminated(catStats[c].qtyArr_delay);
+                    catStats[c].avg_onsched = getAvgQtyOutlierEliminated(catStats[c].qtyArr_onsched);
+                });
+
                 let existingHistoryIdx = dailyHistory.findIndex(h => h.dateKey === todayStr);
                 let currentGlobalPct = kpiTotalLoad > 0 ? (kpiOnSched / kpiTotalLoad) * 100 : 0;
                 let currentCatPct = {};
@@ -1616,7 +1872,6 @@
                 }
             }
 
-            // RENDER DAILY TREND 
             let dailyLabels = dailyHistory.map(h => h.label);
             let pctData = dailyHistory.map(h => {
                 if (activeOverviewCat === 'ALL') return h.pct ? h.pct.toFixed(2) : 0;
@@ -1644,7 +1899,6 @@
 
             if(globalWipData.length === 0) return;
 
-            // RENDER BESAR & KATEGORI CHARTS
             safeSetText('ov-kpi-load', kpiTotalLoad.toLocaleString());
             safeSetText('ov-kpi-sh', kpiSH.toLocaleString());
             safeSetText('ov-kpi-delay', kpiDelay.toLocaleString());
@@ -1653,7 +1907,7 @@
             safeSetHTML('overview-charts-container', ''); 
             const chartsContainer = document.getElementById('overview-charts-container');
 
-            let activeLabels = globalUniquePeriodeWPP.slice(cutoffIndex).map(k => k.split('_')[1]); 
+            let activeLabels = globalUniquePeriodeWPP.slice(cutoffIndex).map(k => { let parts = k.split('_'); return `${parts[0]} - ${parts[1]}`; }); 
             let activeGrandDataArray = globalUniquePeriodeWPP.slice(cutoffIndex).map(k => wppSums[k]);
             
             const renderBigChart = (chartId, titleText, stats, totalArray, shArray, delayArray, schedArray) => {
@@ -1669,30 +1923,30 @@
                         <div class="text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest border border-gray-200 bg-white px-2 lg:px-3 py-1 rounded shadow-sm">Total Load: <span class="text-sm text-gray-900 font-black ml-1">${t.toLocaleString()}</span></div>
                     </div>
                     
-                    <div class="flex flex-col lg:flex-row flex-1 p-4 lg:p-5 gap-4 lg:gap-6 items-center lg:items-stretch overflow-hidden">
+                    <div class="flex flex-col xl:flex-row flex-1 p-4 lg:p-5 gap-4 lg:gap-6 items-center xl:items-stretch overflow-hidden">
                         <!-- Left: Stacked Bar + Line Chart -->
                         <div class="flex-[3] relative min-h-[250px] lg:min-h-[300px] w-full min-w-0 cursor-pointer hover:opacity-90 transition" title="Klik pada batang manapun untuk melihat List Assy">
                             <canvas id="chartLine_${chartId}"></canvas>
                         </div>
                         
                         <!-- Divider -->
-                        <div class="hidden lg:block w-px bg-gray-100 shrink-0 self-stretch my-2"></div>
+                        <div class="hidden xl:block w-px bg-gray-100 shrink-0 self-stretch my-2"></div>
                         
                         <!-- Right: Big Pie Chart + Legend Side by Side -->
-                        <div class="flex-[1.5] w-full lg:w-auto lg:min-w-[300px] flex flex-row items-center justify-center p-3 lg:p-4 bg-gray-50/50 rounded-xl border border-gray-100 shadow-inner shrink-0">
+                        <div class="flex-[1.5] w-full xl:w-auto xl:min-w-[350px] flex flex-row items-center justify-center p-3 lg:p-4 bg-gray-50/50 rounded-xl border border-gray-100 shadow-inner shrink-0 cursor-pointer hover:bg-gray-100 transition" onclick="openAdvancedDrilldown('LEGEND', '${chartId}')">
                             <div class="w-[120px] h-[120px] lg:w-[200px] lg:h-[200px] relative shrink-0"><canvas id="chartPie_${chartId}"></canvas></div>
                             
-                            <div class="flex flex-col gap-2 lg:gap-3 text-[10px] font-bold flex-1 ml-4 lg:ml-6 min-w-[110px]">
-                                <div class="flex justify-between items-center text-blue-700 bg-blue-50 px-2 lg:px-3 py-1.5 lg:py-2 rounded-lg shadow-sm border border-blue-100 hover:bg-blue-100 transition">
-                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">On Sched</span><span class="text-xs lg:text-sm text-gray-900">${stats.onsched.toLocaleString()}</span></div>
+                            <div class="flex flex-col gap-2 lg:gap-3 text-[10px] font-bold flex-1 ml-4 lg:ml-6 min-w-[150px]">
+                                <div class="flex justify-between items-center text-blue-700 bg-blue-50 px-2 lg:px-3 py-1.5 lg:py-2 rounded-lg shadow-sm border border-blue-100 hover:bg-blue-200 transition cursor-pointer" onclick="event.stopPropagation(); openAdvancedDrilldown('PIE_LEGEND', 'ONSCHED', '${chartId === 'GRAND' ? 'ALL' : chartId}')">
+                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">On Sched</span><span class="text-xs lg:text-sm text-gray-900">${stats.onsched.toLocaleString()}</span><span class="text-[7px] text-gray-400 mt-0.5">Assy: ${stats.count_onsched||0} | Avg QTY: ${stats.avg_onsched||0}</span></div>
                                     <span class="bg-white px-1.5 lg:px-2 py-0.5 lg:py-1 rounded shadow-sm text-blue-600 text-[9px] lg:text-[10px]">${pctSched}%</span>
                                 </div>
-                                <div class="flex justify-between items-center text-red-700 bg-red-50 px-2 lg:px-3 py-1.5 lg:py-2 rounded-lg shadow-sm border border-red-100 hover:bg-red-100 transition">
-                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">Delay</span><span class="text-xs lg:text-sm text-gray-900">${stats.delay.toLocaleString()}</span></div>
+                                <div class="flex justify-between items-center text-red-700 bg-red-50 px-2 lg:px-3 py-1.5 lg:py-2 rounded-lg shadow-sm border border-red-100 hover:bg-red-200 transition cursor-pointer" onclick="event.stopPropagation(); openAdvancedDrilldown('PIE_LEGEND', 'DELAY', '${chartId === 'GRAND' ? 'ALL' : chartId}')">
+                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">Delay</span><span class="text-xs lg:text-sm text-gray-900">${stats.delay.toLocaleString()}</span><span class="text-[7px] text-gray-400 mt-0.5">Assy: ${stats.count_delay||0} | Avg QTY: ${stats.avg_delay||0}</span></div>
                                     <span class="bg-white px-1.5 lg:px-2 py-0.5 lg:py-1 rounded shadow-sm text-red-600 text-[9px] lg:text-[10px]">${pctDelay}%</span>
                                 </div>
-                                <div class="flex justify-between items-center text-amber-700 bg-amber-50 px-2 lg:px-3 py-1.5 lg:py-2 rounded-lg shadow-sm border border-amber-100 hover:bg-amber-100 transition">
-                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">Shortage</span><span class="text-xs lg:text-sm text-gray-900">${stats.sh.toLocaleString()}</span></div>
+                                <div class="flex justify-between items-center text-amber-700 bg-amber-50 px-2 lg:px-3 py-1.5 lg:py-2 rounded-lg shadow-sm border border-amber-100 hover:bg-amber-200 transition cursor-pointer" onclick="event.stopPropagation(); openAdvancedDrilldown('PIE_LEGEND', 'SH', '${chartId === 'GRAND' ? 'ALL' : chartId}')">
+                                    <div class="flex flex-col leading-tight"><span class="text-gray-500 uppercase tracking-wider text-[8px]">Shortage</span><span class="text-xs lg:text-sm text-gray-900">${stats.sh.toLocaleString()}</span><span class="text-[7px] text-gray-400 mt-0.5">Assy: ${stats.count_sh||0} | Avg QTY: ${stats.avg_sh||0}</span></div>
                                     <span class="bg-white px-1.5 lg:px-2 py-0.5 lg:py-1 rounded shadow-sm text-amber-600 text-[9px] lg:text-[10px]">${pctSh}%</span>
                                 </div>
                             </div>
@@ -1721,7 +1975,7 @@
                         if (!elements.length) return;
                         const dataIndex = elements[0].index;
                         const pwKey = globalUniquePeriodeWPP.slice(cutoffIndex)[dataIndex];
-                        openDrilldownModal(pwKey, chartId === 'GRAND' ? 'ALL' : chartId);
+                        openAdvancedDrilldown('WPP', pwKey, chartId === 'GRAND' ? 'ALL' : chartId);
                     }
                 });
 
@@ -1739,13 +1993,28 @@
                         },
                         tooltip: { enabled: true }
                     }, 
-                    cutout: '55%' 
+                    cutout: '55%',
+                    onClick: (e, elements, chart) => {
+                        if (!elements.length) return;
+                        const dataIndex = elements[0].index;
+                        let statusParam = dataIndex === 0 ? 'DELAY' : (dataIndex === 1 ? 'ONSCHED' : 'SH');
+                        openAdvancedDrilldown('PIE_LEGEND', statusParam, chartId === 'GRAND' ? 'ALL' : chartId);
+                    }
                 });
             };
 
-            let grandStats = {load:0, delay:0, onsched:0, sh:0};
+            let grandStats = {load:0, delay:0, onsched:0, sh:0, count_delay:0, count_onsched:0, count_sh:0, qtyArr_delay:[], qtyArr_onsched:[], qtyArr_sh:[], avg_delay:0, avg_onsched:0, avg_sh:0};
             if(activeOverviewCat === 'ALL') {
-                CATEGORIES.forEach(cat => { grandStats.load += catStats[cat].load; grandStats.delay += catStats[cat].delay; grandStats.onsched += catStats[cat].onsched; grandStats.sh += catStats[cat].sh; });
+                CATEGORIES.forEach(cat => { 
+                    grandStats.load += catStats[cat].load; grandStats.delay += catStats[cat].delay; grandStats.onsched += catStats[cat].onsched; grandStats.sh += catStats[cat].sh; 
+                    grandStats.count_delay += catStats[cat].count_delay; grandStats.count_onsched += catStats[cat].count_onsched; grandStats.count_sh += catStats[cat].count_sh;
+                    grandStats.qtyArr_delay = grandStats.qtyArr_delay.concat(catStats[cat].qtyArr_delay);
+                    grandStats.qtyArr_onsched = grandStats.qtyArr_onsched.concat(catStats[cat].qtyArr_onsched);
+                    grandStats.qtyArr_sh = grandStats.qtyArr_sh.concat(catStats[cat].qtyArr_sh);
+                });
+                grandStats.avg_delay = getAvgQtyOutlierEliminated(grandStats.qtyArr_delay);
+                grandStats.avg_onsched = getAvgQtyOutlierEliminated(grandStats.qtyArr_onsched);
+                grandStats.avg_sh = getAvgQtyOutlierEliminated(grandStats.qtyArr_sh);
             } else {
                 grandStats = catStats[activeOverviewCat];
             }
@@ -1784,7 +2053,9 @@
             const theTable = document.getElementById('the-matrix-table');
             if(!theTable) return;
             
-            // Kloning tabel ke div tersembunyi
+            setLoaderState('Mengekspor Matriks...', 'Menyusun Resolusi Tinggi & Font', 50, 'Mohon Tunggu');
+            document.getElementById('loading-overlay').classList.remove('hidden');
+
             const printBox = document.createElement('div');
             printBox.style.position = 'absolute'; 
             printBox.style.top = '-9999px'; 
@@ -1796,7 +2067,6 @@
             
             const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             
-            // JUDUL LAPORAN RESMI
             const titleHtml = `
                 <div style="text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #e2e8f0;">
                     <h1 style="font-size: 56px; font-weight: 900; color: #0f172a; margin: 0; padding: 0; letter-spacing: -1px;">RESUME MATRIKS LOADING WIP</h1>
@@ -1805,26 +2075,24 @@
             `;
             
             const clonedTable = theTable.cloneNode(true);
-            
-            // Menyuntikkan CSS Print Stylesheet untuk membengkakkan ukuran font agar terbaca di HP
             const style = document.createElement('style');
             style.innerHTML = `
                 * { font-family: 'Inter', sans-serif !important; color: #0f172a; }
                 .excel-table { width: 100%; border-collapse: collapse; border: 2px solid #cbd5e1; }
                 .excel-table th, .excel-table td { padding: 20px 28px !important; font-size: 24px !important; line-height: 1.6 !important; border: 1px solid #cbd5e1; }
                 .excel-table th { font-size: 26px !important; background-color: #f8fafc !important; font-weight: 800 !important; color: #1e293b !important; text-transform: uppercase; }
-                .text-[9px] { font-size: 20px !important; }
-                .text-[10px] { font-size: 22px !important; }
-                .text-[11px] { font-size: 24px !important; }
-                .text-xs { font-size: 24px !important; }
-                .text-sm { font-size: 28px !important; }
-                .text-xl { font-size: 42px !important; font-weight: 900 !important; }
                 .bg-red-50, .bg-red-50\\/70 { background-color: #fef2f2 !important; color: #b91c1c !important;}
                 .bg-emerald-50, .bg-emerald-50\\/50 { background-color: #ecfdf5 !important; color: #047857 !important;}
                 .bg-[#fce4d6] { background-color: #fce4d6 !important; color: #9a3412 !important; }
                 .bg-[#bdd7ee] { background-color: #bdd7ee !important; color: #1e3a8a !important; }
                 .bg-gray-100 { background-color: #f1f5f9 !important; }
                 .bg-gray-200 { background-color: #e2e8f0 !important; }
+                .text-[9px] { font-size: 20px !important; }
+                .text-[10px] { font-size: 22px !important; }
+                .text-[11px] { font-size: 24px !important; }
+                .text-xs { font-size: 24px !important; }
+                .text-sm { font-size: 28px !important; }
+                .text-xl { font-size: 42px !important; font-weight: 900 !important; }
                 .font-extrabold, .font-black, .font-bold { font-weight: 800 !important; }
                 .text-right { text-align: right !important; }
                 .text-center { text-align: center !important; }
@@ -1837,14 +2105,14 @@
             printBox.appendChild(style);
             document.body.appendChild(printBox);
 
-            showToast('Memproses laporan resolusi tinggi...', 'info');
-
             setTimeout(() => {
                 html2canvas(printBox, { scale: 2, backgroundColor: '#ffffff', logging: false }).then(canvas => {
                     document.body.removeChild(printBox);
+                    document.getElementById('loading-overlay').classList.add('hidden');
                     const link = document.createElement('a'); link.download = `Matrix_WIP_Report_${new Date().toISOString().split('T')[0]}.png`; link.href = canvas.toDataURL('image/png'); link.click();
                 }).catch(err => { 
                     document.body.removeChild(printBox); 
+                    document.getElementById('loading-overlay').classList.add('hidden');
                     showToast('Gagal Export', 'error'); 
                 });
             }, 500);
@@ -2073,7 +2341,8 @@
                         let safeVal = val.replace(/"/g, '&quot;');
                         optionsHtml += `<label class="flex items-center gap-1.5 px-1.5 py-1 hover:bg-gray-100 cursor-pointer text-gray-700 whitespace-normal break-all">
                                             <input type="checkbox" class="form-checkbox h-2.5 w-2.5 text-brand-600 rounded-sm border-gray-300 filter-checkbox" data-col="${col}" data-col-idx="${colIdx}" value="${safeVal}" checked>
-                                            <span class="text-[9px] font-medium truncate">${val || '(Kosong)'}</span>
+                                            <span class="text-[9px] font-medium truncate flex-1">${val || '(Kosong)'}</span>
+                                            <span onclick="event.preventDefault(); filterThisItemOnly('${colIdx}', '${safeVal}', '${col}')" class="text-[8px] text-blue-500 hover:text-blue-700 underline z-10 cursor-pointer shrink-0 ml-1">Filter ini saja</span>
                                         </label>`;
                     });
                     
@@ -2086,11 +2355,12 @@
                                 <div class="px-1.5 py-1 border-b border-gray-100 sticky top-0 bg-white z-10">
                                     <input type="text" placeholder="Cari..." class="w-full text-[9px] p-1 border rounded outline-none focus:border-brand-500" oninput="searchFilter(this, '${colIdx}')">
                                 </div>
-                                <div class="px-1.5 py-1 border-b border-gray-100">
-                                    <label class="flex items-center gap-1.5 cursor-pointer text-gray-800 font-bold">
+                                <div class="px-1.5 py-1 border-b border-gray-100 flex gap-2">
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-gray-800 font-bold flex-1">
                                         <input type="checkbox" class="form-checkbox h-2.5 w-2.5 select-all-cb" data-col="${col}" data-col-idx="${colIdx}" checked onchange="toggleAllCheckboxes(this, '${colIdx}')">
                                         <span class="text-[9px]">Pilih Semua</span>
                                     </label>
+                                    <button onclick="clearColumnFilter('${col}')" class="text-[8px] text-red-500 hover:underline">Hapus Filter</button>
                                 </div>
                                 <div id="filter-list-${colIdx}">${optionsHtml}</div>
                             </div>
@@ -2161,13 +2431,22 @@
                 else if(row._status === 'CND 2') { bgClass = 'bg-amber-50'; badge = `<span class="bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded shadow-sm">CND 2</span>`; }
                 else { badge = `<span class="bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded shadow-sm">OPEN</span>`; }
 
-                htmlString += `<tr class="hover:bg-gray-200 ${bgClass} transition-colors border-b border-gray-100">`;
+                htmlString += `<tr class="hover:bg-gray-200 ${bgClass} transition-colors border-b border-gray-100 cursor-context-menu" oncontextmenu="forceCloseAssy(event, '${row._uid}')" title="Klik Kanan baris ini untuk Force Close">`;
                 htmlString += `<td class="px-2 py-1 border-r border-gray-200 text-center align-middle">${badge}</td>`;
                 
                 displayHeaders.forEach(col => {
                     if (col === 'STATUS') return;
                     let cellData = row[col] !== undefined ? row[col] : '';
                     let colDateClass = isDateColumn(col) ? "font-mono font-bold" : "";
+                    
+                    // PERBAIKAN: GUNAKAN NILAI WIP JIKA KOLOM ADALAH QTY DAN DATA ADA DI WIP
+                    if (col === 'QTY') {
+                        let wipData = globalWipData.find(w => w._uid === row._uid);
+                        if (wipData && wipData['PP']) {
+                            cellData = wipData['PP'];
+                        }
+                    }
+
                     htmlString += `<td class="px-2 py-1 border-r border-gray-100 max-w-[200px] truncate align-middle ${colDateClass}">${cellData}</td>`;
                 });
                 htmlString += `</tr>`;
@@ -2176,6 +2455,31 @@
             safeSetHTML('control-tbody', htmlString);
             safeSetText('control-counter', filteredData.length > displayLimit ? `Preview ${displayLimit}/${filteredData.length} Baris` : `Total ${filteredData.length} Baris`);
         }
+
+        // FUNGSI FORCE CLOSE
+        window.forceCloseAssy = function(e, uid) {
+            e.preventDefault(); // Matikan menu klik kanan browser bawaan
+            let target = globalMasterData.find(m => m._uid === uid);
+            if(!target) return;
+            
+            if(target._status === 'CLOSED') {
+                showToast('Assy ini sudah berstatus CLOSED.', 'info');
+                return;
+            }
+            
+            if(confirm(`Yakin ingin mengubah status Assy [ ${target.ASSY || ''} ] secara paksa menjadi CLOSED?`)) {
+                target._status = 'CLOSED';
+                target._closedDate = getTodayDateStr();
+                
+                saveDB('master_data', globalMasterData);
+                renderControlOutstanding(); // Refresh tabel bersih
+                
+                // Memicu refresh dashboard diam-diam agar metrik atas terupdate
+                if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
+                
+                showToast('Assy berhasil di-Closed secara paksa.', 'success');
+            }
+        };
 
         // ==========================================
         // 8. SH MATERIAL LOGIC

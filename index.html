@@ -243,7 +243,13 @@
         </div>
 
         <div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg hidden" id="nav-center-menus">
+<button onclick="openChatModal()" class="relative px-3 py-1.5 rounded-md text-xs font-semibold transition text-sky-700 bg-sky-100 border border-sky-200 hover:bg-sky-200 flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                <span id="chat-badge" class="hidden absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white shadow-sm border border-white animate-pulse">0</span>
+            </button>
             <button id="btn-tab-overview" onclick="switchTab('overview')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-500 hover:text-gray-800 border border-transparent">Overview</button>
+            
+            <div class="w-px h-5 bg-gray-300 mx-1"></div>
             <button onclick="recalculateValidation()" class="px-2 py-1.5 bg-brand-100 text-brand-700 hover:bg-brand-200 rounded text-[10px] font-bold shadow-sm transition flex items-center gap-1" title="Hitung ulang status Open/Closed/CND3 berdasarkan tanggal aktual"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Recalculate Validasi</button>
             <div class="w-px h-5 bg-gray-300 mx-1"></div>
             <button id="btn-tab-report" onclick="switchTab('report')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800">Resume Analisis</button>
@@ -663,6 +669,57 @@
 
     </main>
 
+</main>
+
+    <!-- CHAT / MANAJEMEN REVIEW MODAL -->
+    <div id="chat-modal" class="fixed inset-0 bg-gray-900/80 z-[10000] hidden flex flex-col items-center justify-center p-4 lg:p-8 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-full max-h-[85vh] flex flex-col overflow-hidden border border-gray-200">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-sky-100 flex justify-between items-center bg-gradient-to-r from-sky-50 to-white shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="bg-sky-500 text-white p-2 rounded-xl shadow-sm"><i data-lucide="messages-square" class="w-5 h-5"></i></div>
+                    <div>
+                        <h3 class="font-black text-lg text-gray-800 tracking-tight leading-none">Manajemen Review & Komunikasi</h3>
+                        <span class="text-[10px] text-sky-600 font-bold mt-1 inline-block">Log Diskusi Produksi dan Eksekutif WIP</span>
+                    </div>
+                </div>
+                <button onclick="closeChatModal()" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <!-- Body: Side by Side -->
+            <div class="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                <!-- Left: Chat Log -->
+                <div class="flex-[2] bg-gray-50/50 flex flex-col border-r border-gray-100 relative">
+                    <div id="chat-log-container" class="flex-1 overflow-y-auto p-6 space-y-4">
+                        <div class="text-center text-gray-400 text-xs font-medium mt-10">Memuat percakapan...</div>
+                    </div>
+                </div>
+                
+                <!-- Right: Input Form -->
+                <div class="flex-[1] bg-white flex flex-col p-6 shrink-0 relative min-w-[300px]">
+                    <h4 class="text-xs font-black text-gray-800 mb-4 uppercase tracking-wider flex items-center gap-2"><i data-lucide="pen-line" class="w-4 h-4 text-sky-500"></i> Tulis Pesan Baru</h4>
+                    
+                    <div class="flex-1 flex flex-col gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase">Nama Pengirim (Signature)</label>
+                            <input type="text" id="chat-sender-input" placeholder="Contoh: Budi (PP) / Manager" class="w-full text-xs border border-gray-300 px-3 py-2.5 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition bg-gray-50 focus:bg-white font-bold text-gray-800 shadow-inner">
+                        </div>
+                        <div class="flex flex-col gap-1.5 flex-1">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase">Isi Pesan</label>
+                            <textarea id="chat-message-input" placeholder="Ketik catatan atau review di sini... (Tekan Ctrl+Enter untuk kirim, Enter untuk baris baru)" onkeydown="if(event.key === 'Enter' && event.ctrlKey) { event.preventDefault(); sendChatMessage(); }" class="w-full text-xs border border-gray-300 px-3 py-2.5 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition bg-gray-50 focus:bg-white resize-none flex-1 shadow-inner leading-relaxed"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <button onclick="sendChatMessage()" id="btn-send-chat" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                            <i data-lucide="send" class="w-4 h-4"></i> Kirim Pesan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ==========================================
         // 1. FIREBASE DATA ENGINE (FILE-BASED PARTITIONING)
@@ -812,6 +869,9 @@
         let globalUniquePeriodeWPP = []; 
         let globalCutoffPWKey = null; 
         let globalDelayPWKey = null;  
+
+	let globalChatData = [];
+        let lastReadChatCount = 0;
 
         let uploadedMasterFiles = [];
         let uploadedWipFiles = [];
@@ -1009,6 +1069,135 @@
         };
 
         // ==========================================
+        // MANAJEMEN REVIEW (SISTEM CHAT & NOTIF)
+        // ==========================================
+        function initChatListener() {
+            if (!isFirebaseActive) return;
+            db.collection("management_chat").orderBy("timestamp", "asc").onSnapshot((snapshot) => {
+                globalChatData = [];
+                snapshot.forEach((doc) => { globalChatData.push({ id: doc.id, ...doc.data() }); });
+                
+                renderChatMessages();
+                
+                const isModalOpen = !document.getElementById('chat-modal').classList.contains('hidden');
+                if (isModalOpen) {
+                    lastReadChatCount = globalChatData.length;
+                    saveDB('last_read_chat', lastReadChatCount); 
+                }
+                updateChatBadge();
+            });
+        }
+
+        window.openChatModal = function() {
+            document.getElementById('chat-modal').classList.remove('hidden');
+            lastReadChatCount = globalChatData.length;
+            saveDB('last_read_chat', lastReadChatCount);
+            updateChatBadge();
+            setTimeout(() => { scrollToBottomChat(); document.getElementById('chat-message-input').focus(); }, 100);
+        };
+
+        window.closeChatModal = function() {
+            document.getElementById('chat-modal').classList.add('hidden');
+        };
+
+        function updateChatBadge() {
+            const badge = document.getElementById('chat-badge');
+            const unread = globalChatData.length - lastReadChatCount;
+            if (unread > 0) {
+                badge.innerText = unread > 99 ? '99+' : unread;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function renderChatMessages() {
+            const container = document.getElementById('chat-log-container');
+            if (!container) return;
+            
+            if (globalChatData.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 text-xs font-medium mt-10 flex flex-col items-center gap-2"><i data-lucide="message-square-dashed" class="w-10 h-10 opacity-30"></i> Belum ada percakapan terdata.</div>';
+                lucide.createIcons();
+                return;
+            }
+            
+            let html = '';
+            let lastDate = '';
+            
+            globalChatData.forEach(msg => {
+                let dateObj = new Date(msg.timestamp);
+                let dateStr = dateObj.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+                let timeStr = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                
+                if(dateStr !== lastDate) {
+                    html += `<div class="flex justify-center my-5"><span class="bg-sky-100 text-sky-800 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">${dateStr}</span></div>`;
+                    lastDate = dateStr;
+                }
+                
+                let initial = (msg.sender || 'U').charAt(0).toUpperCase();
+                
+                html += `
+                <div class="flex flex-col gap-1 items-start w-full">
+                    <div class="flex items-end gap-2.5 max-w-[85%]">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-sky-700 shrink-0 flex items-center justify-center text-white font-black text-sm shadow-md border border-white">
+                            ${initial}
+                        </div>
+                        <div class="bg-white p-3.5 rounded-2xl rounded-bl-sm shadow-sm border border-gray-200 flex flex-col relative group">
+                            <span class="text-[10px] font-black text-sky-700 mb-1">${msg.sender || 'Unknown'}</span>
+                            <p class="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">${msg.message}</p>
+                            <span class="text-[8px] text-gray-400 font-bold mt-2 text-right">${timeStr}</span>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+            lucide.createIcons();
+            
+            if (!document.getElementById('chat-modal').classList.contains('hidden')) {
+                scrollToBottomChat();
+            }
+        }
+
+        function scrollToBottomChat() {
+            const container = document.getElementById('chat-log-container');
+            if (container) container.scrollTop = container.scrollHeight;
+        }
+
+        window.sendChatMessage = async function() {
+            if (!isFirebaseActive) { showToast('Firebase belum aktif', 'error'); return; }
+            
+            const senderInput = document.getElementById('chat-sender-input');
+            const messageInput = document.getElementById('chat-message-input');
+            const sender = senderInput.value.trim();
+            const message = messageInput.value.trim();
+            const btn = document.getElementById('btn-send-chat');
+            
+            if (!sender) { showToast('Nama pengirim (Signature) wajib diisi', 'warning'); senderInput.focus(); return; }
+            if (!message) { showToast('Pesan tidak boleh kosong', 'warning'); messageInput.focus(); return; }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Mengirim...';
+            lucide.createIcons();
+            
+            try {
+                await db.collection("management_chat").add({
+                    sender: sender,
+                    message: message,
+                    timestamp: Date.now()
+                });
+                messageInput.value = '';
+                scrollToBottomChat();
+            } catch(e) {
+                showToast('Gagal mengirim pesan', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i> Kirim Pesan';
+                lucide.createIcons();
+            }
+        };
+
+        // ==========================================
         // 3. INIT & TAB LOGIC + AUTO RESET
         // ==========================================
         window.onload = async function() {
@@ -1061,6 +1250,10 @@
             globalDelayPWKey = await loadDB('global_delay_key');
             masterHeaders = sanitizeHeaders(await loadDB('master_headers'));
             masterHeaders.forEach(h => masterHeadersSet.add(h));
+
+	    let readChat = await loadDB('last_read_chat');
+            lastReadChatCount = readChat ? parseInt(readChat) : 0;
+            initChatListener();
 
             let lastWipDate = await loadDB('last_wip_date');
             let todayStr = getTodayDateStr();

@@ -224,9 +224,15 @@
             </div>
             
             <div class="p-4 border-t border-gray-200 bg-white flex justify-between items-center shrink-0">
-                <div id="sh-validation-summary" class="text-[10px] font-bold text-gray-500">Total Validasi: 0 Assy</div>
-                <button onclick="saveShAsShortage()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition flex items-center gap-2"><i data-lucide="shield-alert" class="w-4 h-4"></i> Tetapkan sebagai SH (Shortage)</button>
-            </div>
+                    <div id="sh-validation-summary" class="text-[10px] font-bold text-gray-500">Total Validasi: 0 Assy</div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex flex-col">
+                            <label class="text-[9px] font-bold text-gray-500 uppercase mb-0.5">Estimasi Kedatangan</label>
+                            <input type="date" id="sh-estimasi-input" class="text-xs border border-gray-300 px-2 py-1.5 rounded focus:border-amber-500 outline-none text-gray-700 bg-white">
+                        </div>
+                        <button onclick="saveShAsShortage()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition flex items-center gap-2 h-full"><i data-lucide="shield-alert" class="w-4 h-4"></i> Tetapkan sebagai SH (Shortage)</button>
+                    </div>
+                </div>
         </div>
     </div>
 
@@ -1822,7 +1828,45 @@
 
             const overlay = document.getElementById('loading-overlay');
             if(overlay) overlay.classList.remove('hidden');
-            setLoaderState('Menghitung Ulang...', 'Memvalidasi Tanggal', 50, '');
+            setLoaderState('Menghitung Ulang...', 'Auto-Expand SH & Validasi Tanggal', 50, '');
+
+            // ==========================================
+            // MESIN AUTO-EXPAND SH 'SEKARANG' (SETERUSNYA)
+            // ==========================================
+            let isShModified = false;
+            let wipMapTemp = new Map(); globalWipData.forEach(w => wipMapTemp.set(w._uid, w));
+            globalShMaterials.forEach(sh => {
+                if (sh.endPeriod === 'Sekarang' && sh.tanggalKedatangan === null && sh.affectedAssys && sh.affectedAssys.length > 0) {
+                    let periodes = Array.from(new Set(globalMasterData.map(m => String(m['PERIODE'] || '').trim()).filter(p => p && p !== '-'))).sort();
+                    let startIndex = periodes.indexOf(sh.startPeriod);
+                    if(startIndex !== -1) {
+                        let validPeriods = periodes.slice(startIndex);
+                        let newUids = globalMasterData.filter(m => m._status !== 'CLOSED' && validPeriods.includes(String(m.PERIODE).trim()) && sh.affectedAssys.includes(superCleanAssy(m.ASSY))).map(m => m._uid);
+                        
+                        let oldUidCount = sh.targetUids ? sh.targetUids.length : 0;
+                        let mergedUids = Array.from(new Set([...(sh.targetUids||[]), ...newUids]));
+                        
+                        if(mergedUids.length > oldUidCount) { // Jika mendeteksi ada Assy target yang baru diupload!
+                            sh.targetUids = mergedUids;
+                            let newCct = 0;
+                            sh.targetUids.forEach(uid => {
+                                let m = globalMasterData.find(x => x._uid === uid);
+                                if(m) {
+                                    let w = wipMapTemp.get(uid);
+                                    newCct += (w && w['PP CCT'] ? parseFloat(w['PP CCT']) : parseFloat(m['TOTAL CCT'] || 0));
+                                }
+                            });
+                            sh.totalCct = newCct;
+                            isShModified = true;
+                        }
+                    }
+                }
+            });
+            if(isShModified) {
+                await saveDB('sh_materials', globalShMaterials);
+                try { renderShMaterials(); } catch(e){} 
+            }
+            // ==========================================
 
             let today = new Date(); today.setHours(0,0,0,0);
             let todayStr = getTodayDateStr();
@@ -1830,6 +1874,7 @@
 
             let wipUidSet = new Set();
             let wipRowMap = new Map();
+
             globalWipData.forEach(row => {
                 let uid = row._uid;
                 if(uid) { wipUidSet.add(uid); wipRowMap.set(uid, row); }
@@ -3280,6 +3325,7 @@
             document.getElementById('sh-item-id-input').value = '';
             document.getElementById('sh-manual-assy').value = '';
             document.getElementById('sh-excel-upload').value = '';
+            if (document.getElementById('sh-estimasi-input')) document.getElementById('sh-estimasi-input').value = '';
             
             let periodes = new Set();
             globalMasterData.forEach(m => {
@@ -3292,11 +3338,12 @@
             
             let elStart = document.getElementById('sh-per-start');
             let elEnd = document.getElementById('sh-per-end');
-            elStart.innerHTML = optHtml; elEnd.innerHTML = optHtml;
+            elStart.innerHTML = optHtml; 
+            elEnd.innerHTML = optHtml + `<option value="Sekarang" class="font-bold text-sky-600">Sekarang (Seterusnya)</option>`;
             
             if(sortedPeriodes.length > 0) {
                 elStart.value = sortedPeriodes[0];
-                elEnd.value = sortedPeriodes[sortedPeriodes.length - 1];
+                elEnd.value = "Sekarang"; // Set default ke Sekarang
             }
 
             safeSetHTML('sh-validation-tbody', '<tr><td colspan="7" class="text-center p-8 text-gray-400 font-medium">Input list Assy dan Periode, lalu klik Validasi List Assy.</td></tr>');
@@ -3383,17 +3430,24 @@
 
             let periodes = Array.from(new Set(globalMasterData.map(m => String(m['PERIODE'] || '').trim()).filter(p => p && p !== '-'))).sort();
             let startIndex = periodes.indexOf(pStart.trim());
-            let endIndex = periodes.indexOf(pEnd.trim());
-            
-            if (startIndex === -1 || endIndex === -1 || startIndex > endIndex) { 
-                showToast("Rentang Periode Tidak Valid di Database.", "warning"); return; 
+            let validPeriods = [];
+
+            if (pEnd === 'Sekarang') {
+                if (startIndex === -1) { showToast("Rentang Periode Tidak Valid di Database.", "warning"); return; }
+                validPeriods = periodes.slice(startIndex);
+            } else {
+                let endIndex = periodes.indexOf(pEnd.trim());
+                if (startIndex === -1 || endIndex === -1 || startIndex > endIndex) { 
+                    showToast("Rentang Periode Tidak Valid di Database.", "warning"); return; 
+                }
+                validPeriods = periodes.slice(startIndex, endIndex + 1);
             }
-            let validPeriods = periodes.slice(startIndex, endIndex + 1);
 
             let wipMap = new Map(); globalWipData.forEach(w => wipMap.set(w._uid, w));
             window.tempShValidatedData = [];
 
             let cleanCombinedList = combinedList.map(a => superCleanAssy(a));
+            window.tempShCleanAssyList = cleanCombinedList; // Simpan daftar assy mentah untuk auto-expand SH
 
             let matchingMaster = globalMasterData.filter(m => {
                 if(m._status === 'CLOSED') return false; // Abaikan Assy yang sudah CLOSED
@@ -3478,6 +3532,7 @@
             let itemId = document.getElementById('sh-item-id-input').value.trim();
             let pStart = document.getElementById('sh-per-start').value;
             let pEnd = document.getElementById('sh-per-end').value;
+            let estDate = document.getElementById('sh-estimasi-input') ? document.getElementById('sh-estimasi-input').value : '';
 
             if(!itemId) {
                 showToast("Nama Part / Item ID wajib diisi sebagai identitas.", "error"); return;
@@ -3493,8 +3548,10 @@
                 startPeriod: pStart, 
                 endPeriod: pEnd,
                 targetUids: uids, 
+                affectedAssys: window.tempShCleanAssyList || [], // Simpan blueprint raw list untuk fitur Seterusnya
                 totalCct: grandCct,
                 tanggalSH: getTodayDateStr().split('-').reverse().join('-'), 
+                estimasiKedatangan: estDate || null,
                 id: Date.now(), 
                 tanggalKedatangan: null
             };
@@ -3562,6 +3619,8 @@
                 let actionBtn = isDatang ? `<span class="text-[9px] font-bold text-green-600 flex items-center justify-center gap-1 bg-green-50 py-1 rounded border border-green-100"><i data-lucide="check-circle" class="w-2.5 h-2.5"></i> Arrived: ${sh.tanggalKedatangan}</span>` : `<button onclick="confirmArrival(${sh.id})" class="w-full text-[9px] font-bold bg-gray-800 text-white py-1 rounded hover:bg-gray-900 transition flex items-center justify-center gap-1"><i data-lucide="truck" class="w-2.5 h-2.5"></i> Konfirmasi Kedatangan</button>`;
                 let assyCount = sh.targetUids ? sh.targetUids.length : 0;
 
+                let estStr = sh.estimasiKedatangan ? sh.estimasiKedatangan.split('-').reverse().join('-') : 'Belum diatur';
+                
                 html += `
                     <div class="bento-box p-3 flex flex-col ${bgStyle} relative overflow-hidden shadow-sm hover:shadow transition">
                         <div class="absolute top-0 left-0 w-full h-1.5 ${isDatang ? 'bg-green-500' : 'bg-red-500'}"></div>
@@ -3576,6 +3635,7 @@
                             <div class="flex justify-between"><span class="text-gray-500 font-medium">Periode Terdampak</span><span class="font-bold text-gray-800">${sh.startPeriod || ''} - ${sh.endPeriod || ''}</span></div>
                             <div class="flex justify-between"><span class="text-gray-500 font-medium">Total CCT Terdampak</span><span class="font-bold text-red-600">${(sh.totalCct || 0).toLocaleString()}</span></div>
                             <div class="flex justify-between"><span class="text-gray-500 font-medium">Tgl ID Dibuat</span><span class="font-bold text-gray-600">${sh.tanggalSH}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500 font-medium">Estimasi Kedatangan</span><span class="font-bold text-amber-600">${estStr}</span></div>
                         </div>
                         <div class="mt-auto">${actionBtn}</div>
                     </div>

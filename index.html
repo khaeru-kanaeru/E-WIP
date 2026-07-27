@@ -54,7 +54,7 @@
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
         #loading-overlay { backdrop-filter: blur(4px); transition: opacity 0.3s; }
-        .progress-bar-fill { transition: width 0.1s linear; }
+        .progress-bar-fill { transition: width 0.3s ease-out; }
         
         /* EXCEL TABLE STYLE */
         .excel-table { border-collapse: separate; border-spacing: 0; width: 100%; }
@@ -65,7 +65,8 @@
         .excel-table .footer-row td { background-color: #f8fafc; font-weight: bold; border-top: 2px solid #475569; }
         .excel-table .sub-footer td { border-top: 1px solid #e2e8f0; }
         
-        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 999999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { pointer-events: auto; /* Memastikan toast tetap bisa berinteraksi jika kedepannya ada tombol */ }
         .toast { padding: 12px 20px; border-radius: 8px; color: white; font-weight: 600; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transform: translateY(20px); transition: all 0.3s ease; }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.success { background-color: #10b981; }
@@ -83,10 +84,28 @@
 
     <div id="toast-container"></div>
 
+    <!-- AUTH PIN MODAL -->
+    <div id="auth-modal" class="fixed inset-0 bg-gray-900/80 z-[10005] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden border border-gray-200">
+            <div class="px-5 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 class="font-black text-gray-800 flex items-center gap-2"><i data-lucide="lock" class="w-5 h-5 text-brand-500"></i> Otorisasi Akses</h3>
+                <button onclick="closeAuthModal()" class="text-gray-400 hover:text-red-500 transition p-1 rounded-md hover:bg-white border border-transparent hover:border-gray-200"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="p-6 flex flex-col gap-4 text-center bg-white">
+                <p class="text-[10px] text-gray-500 font-bold">Masukkan PIN Verifikasi / User ID untuk mengelola data pada menu ini.</p>
+                <input type="password" id="auth-pin-input" placeholder="••••••" onkeydown="if(event.key === 'Enter') submitAuth()" class="w-full text-center text-2xl tracking-[0.5em] font-black border border-gray-300 px-3 py-3 rounded-xl focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none text-gray-800 bg-gray-50 shadow-inner">
+            </div>
+            <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
+                <button onclick="closeAuthModal()" class="px-4 py-2 rounded-lg text-xs font-bold text-gray-500 hover:bg-gray-200 transition">Batal</button>
+                <button onclick="submitAuth()" class="bg-brand-500 hover:bg-brand-600 text-white px-6 py-2 rounded-lg shadow-md text-xs font-bold flex items-center gap-2 transition"><i data-lucide="unlock" class="w-4 h-4"></i> Validasi</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Screen Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-gray-900/80 z-50 flex flex-col items-center justify-center">
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900/80 z-[99999] flex flex-col items-center justify-center">
         <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
-            <div class="animate-bounce mb-4"><i data-lucide="cloud" class="w-12 h-12 text-brand-500 mx-auto"></i></div>
+            <div class="flex justify-center mb-5"><i data-lucide="star" class="w-12 h-12 text-amber-400 fill-amber-400 animate-spin"></i></div>
             <h3 class="text-lg font-bold text-gray-800 mb-1" id="loading-title">Menghubungkan ke Cloud...</h3>
             <p class="text-xs text-gray-500 mb-6" id="loading-desc">Membaca data dari server Firebase.</p>
             <div class="w-full bg-gray-100 rounded-full h-3 mb-2 overflow-hidden border border-gray-200">
@@ -226,10 +245,6 @@
             <div class="p-4 border-t border-gray-200 bg-white flex justify-between items-center shrink-0">
                     <div id="sh-validation-summary" class="text-[10px] font-bold text-gray-500">Total Validasi: 0 Assy</div>
                     <div class="flex items-center gap-3">
-                        <div class="flex flex-col">
-                            <label class="text-[9px] font-bold text-gray-500 uppercase mb-0.5">Estimasi Kedatangan</label>
-                            <input type="date" id="sh-estimasi-input" class="text-xs border border-gray-300 px-2 py-1.5 rounded focus:border-amber-500 outline-none text-gray-700 bg-white">
-                        </div>
                         <button onclick="saveShAsShortage()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition flex items-center gap-2 h-full"><i data-lucide="shield-alert" class="w-4 h-4"></i> Tetapkan sebagai SH (Shortage)</button>
                     </div>
                 </div>
@@ -261,13 +276,14 @@
             <button id="btn-tab-report" onclick="switchTab('report')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800">Resume Analisis</button>
             <button id="btn-tab-control" onclick="switchTab('control')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800 flex items-center gap-1"> Database Bersih</button>
             <button id="btn-tab-sh" onclick="switchTab('sh')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800">SH Material</button>
+            <button id="btn-tab-rocket" onclick="switchTab('rocket')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-pink-600 flex items-center gap-1"><i data-lucide="rocket" class="w-3.5 h-3.5"></i> Assy Rocket</button>
         </div>
 
         <div class="flex items-center gap-2">
-            <button id="btn-tab-master" onclick="switchTab('master')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1.5">
+            <button id="btn-tab-master" onclick="requireAccess(['110603', '111111'], () => switchTab('master'))" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1.5">
                 <i data-lucide="library" class="w-3.5 h-3.5"></i> Master Data (MPP)
             </button>
-            <button id="btn-tab-input" onclick="switchTab('input')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 flex items-center gap-1.5">
+            <button id="btn-tab-input" onclick="requireAccess(['110603', '111111'], () => switchTab('input'))" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 flex items-center gap-1.5">
                 <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i> WIP Input (Harian)
             </button>
         </div>
@@ -280,13 +296,14 @@
             <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Global Threshold Control:</span>
         </div>
         <div class="flex flex-wrap items-center gap-3">
+            <div id="greet-control" class="mr-2"></div>
             <div class="flex items-center gap-1.5 bg-white px-2 py-0.5 border border-amber-300 rounded shadow-sm">
                 <span class="text-[9px] font-bold text-gray-500 uppercase">1. Cut-Off (Abaikan WPP Lama):</span>
-                <select id="cutoff-wpp-select" onchange="updateCutoffThreshold(this.value)" class="text-[10px] font-bold outline-none text-gray-800 bg-transparent"></select>
+                <select id="cutoff-wpp-select" onchange="attemptUpdateCutoff(this)" class="text-[10px] font-bold outline-none text-gray-800 bg-transparent cursor-pointer"></select>
             </div>
             <div class="flex items-center gap-1.5 bg-white px-2 py-0.5 border border-amber-300 rounded shadow-sm">
                 <span class="text-[9px] font-bold text-gray-500 uppercase">2. Batas Outstanding (Delay):</span>
-                <select id="delay-wpp-select" onchange="updateDelayThreshold(this.value)" class="text-[10px] font-bold outline-none text-red-600 bg-transparent"></select>
+                <select id="delay-wpp-select" onchange="attemptUpdateDelay(this)" class="text-[10px] font-bold outline-none text-red-600 bg-transparent cursor-pointer"></select>
             </div>
         </div>
     </div>
@@ -441,6 +458,7 @@
         <section id="view-master" class="hidden h-full flex flex-col items-center justify-start py-10 overflow-auto">
             <div class="bento-box max-w-2xl w-full p-8 text-center relative overflow-hidden shadow-xl shrink-0">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-indigo-500"></div>
+                <div class="absolute top-4 right-4" id="greet-master"></div>
                 <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-indigo-100">
                     <i data-lucide="library" class="text-indigo-600 w-8 h-8"></i>
                 </div>
@@ -483,6 +501,7 @@
         <section id="view-input" class="hidden h-full flex flex-col items-center justify-start py-10 overflow-auto">
             <div class="bento-box max-w-2xl w-full p-8 text-center relative overflow-hidden shadow-xl shrink-0">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-brand-500"></div>
+                <div class="absolute top-4 right-4" id="greet-input"></div>
                 <div class="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-brand-100">
                     <i data-lucide="database" class="text-brand-600 w-8 h-8"></i>
                 </div>
@@ -588,16 +607,83 @@
 
         <!-- ================= SH MATERIAL VIEW ================= -->
         <section id="view-sh" class="hidden h-full flex flex-col gap-3 overflow-hidden pb-4">
-            <div class="flex justify-between items-center shrink-0 px-2 mt-2">
+            <div class="flex justify-between items-center shrink-0 px-4 mt-2">
                 <div>
-                    <h2 class="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight"><i data-lucide="shield-alert" class="text-amber-500 w-5 h-5"></i> Input Data Shortage Material</h2>
-                    <p class="text-[10px] text-gray-500 font-medium">Tetapkan Assy yang terdampak material Shortage (Hanya validasi Assy yang belum Finish).</p>
+                    <h2 class="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight"><i data-lucide="shield-alert" class="text-amber-500 w-5 h-5"></i> Daftar Shortage Material</h2>
+                    <p class="text-[10px] text-gray-500 font-medium">Klik pada baris material untuk melihat detail & konfirmasi kedatangan.</p>
                 </div>
-                <button onclick="openShInputModal()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Input Data Shortage
-                </button>
+                <div class="flex items-center gap-3">
+                    <div id="greet-sh"></div>
+                    <button onclick="requireAccess(['110603', '050205', '111111'], openShInputModal)" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Input SH Baru
+                    </button>
+                </div>
             </div>
-            <div id="sh-cards-container" class="flex-1 overflow-auto grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 content-start pb-2 px-2"></div>
+            <div class="flex-1 overflow-auto bg-gray-50/30 p-2 mx-2 border border-gray-200 rounded-lg shadow-sm">
+                <table class="w-full text-xs whitespace-nowrap border-collapse text-left">
+                    <thead class="bg-gray-100 text-gray-600 sticky top-0 shadow-sm z-10 font-bold uppercase tracking-wider text-[10px]">
+                        <tr>
+                            <th class="p-3 border-b border-gray-200">Item ID / Part Name</th>
+                            <th class="p-3 border-b border-gray-200 text-center">
+                                <select id="filter-sh-type" onchange="renderShMaterials()" class="bg-transparent border-b border-gray-300 outline-none cursor-pointer focus:border-amber-500 py-0.5">
+                                    <option value="ALL">KATEGORI (SEMUA)</option>
+                                    <option value="Terminal">Terminal</option>
+                                    <option value="Rubberseal">Rubberseal</option>
+                                    <option value="Wire">Wire</option>
+                                    <option value="Tube">Tube</option>
+                                    <option value="Lain-lain">Lain-lain</option>
+                                </select>
+                            </th>
+                            <th class="p-3 border-b border-gray-200 text-center">Tgl Input</th>
+                            <th class="p-3 border-b border-gray-200 text-center">Estimasi Kedatangan</th>
+                            <th class="p-3 border-b border-gray-200 text-center">Status</th>
+                            <th class="p-3 border-b border-gray-200 text-right">Terdampak</th>
+                            <th class="p-3 border-b border-gray-200">Remarks (Catatan PPC)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sh-table-body" class="divide-y divide-gray-100 bg-white"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ================= ASSY ROCKET VIEW ================= -->
+        <section id="view-rocket" class="hidden h-full flex flex-col gap-3 overflow-hidden pb-4">
+            <div class="flex justify-between items-center shrink-0 px-4 mt-2">
+                <div>
+                    <h2 class="text-lg font-black text-pink-700 flex items-center gap-2 tracking-tight"><i data-lucide="rocket" class="w-5 h-5"></i> Manajemen Assy Rocket</h2>
+                    <p class="text-[10px] text-gray-500 font-medium">Prioritas STWC & Produksi khusus (Otomatis ditandai Pink di Database Bersih).</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="greet-rocket"></div>
+                    <select id="filter-rocket-status" onchange="renderRocketTable()" class="text-xs border border-pink-200 bg-pink-50 text-pink-800 font-bold px-3 py-2 rounded-lg outline-none cursor-pointer focus:border-pink-500">
+                        <option value="ALL">Semua Status (Urgent, Rocket)</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="Top Urgent">Top Urgent</option>
+                        <option value="Rocket">Rocket</option>
+                    </select>
+                    <button onclick="requireAccess(['110603', '010625', '111111'], openRocketModal)" class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Tetapkan Assy Rocket
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto bg-gray-50/30 p-2 mx-2 border border-pink-200 rounded-lg shadow-sm">
+                <table class="w-full text-xs whitespace-nowrap border-collapse text-left">
+                    <thead class="bg-pink-50 text-pink-900 sticky top-0 shadow-sm z-10 font-bold uppercase tracking-wider text-[10px]">
+                        <tr>
+                            <th class="p-3 border-b border-pink-200 text-center w-10">Aksi</th>
+                            <th class="p-3 border-b border-pink-200 text-center">Prioritas</th>
+                            <th class="p-3 border-b border-pink-200 text-center">Tgl Rocket (Target)</th>
+                            <th class="p-3 border-b border-pink-200 text-center">Periode</th>
+                            <th class="p-3 border-b border-pink-200">Assy No</th>
+                            <th class="p-3 border-b border-pink-200 text-center">WP</th>
+                            <th class="p-3 border-b border-pink-200 text-right">Sisa Qty DB</th>
+                            <th class="p-3 border-b border-pink-200 text-center">Status WIP</th>
+                            <th class="p-3 border-b border-pink-200">Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rocket-table-body" class="divide-y divide-pink-100 bg-white"></tbody>
+                </table>
+            </div>
         </section>
 
         <!-- SHORTAGE MASS-INPUT MODAL -->
@@ -668,7 +754,159 @@
                 
                 <div class="p-4 border-t border-gray-200 bg-white flex justify-between items-center shrink-0">
                     <div id="sh-validation-summary" class="text-[10px] font-bold text-gray-500">Total Validasi: 0 Assy</div>
-                    <button onclick="saveShAsShortage()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition flex items-center gap-2"><i data-lucide="shield-alert" class="w-4 h-4"></i> Tetapkan sebagai SH (Shortage)</button>
+                    <button onclick="confirmSaveSh()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition flex items-center gap-2"><i data-lucide="shield-alert" class="w-4 h-4"></i> Tetapkan sebagai SH (Shortage)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SH EDIT MODAL (POP-UP ESTIMASI & REMARKS) -->
+        <div id="sh-edit-modal" class="fixed inset-0 bg-gray-900/80 z-[10005] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200">
+                <div class="px-5 py-4 border-b border-amber-200 bg-amber-50 flex justify-between items-center">
+                    <h3 class="font-black text-amber-900 flex items-center gap-2"><i data-lucide="edit" class="w-4 h-4"></i> Edit Estimasi & Remarks SH</h3>
+                    <button onclick="closeEditShModal()" class="text-amber-500 hover:text-red-500 transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+                <div class="p-5 flex flex-col gap-4">
+                    <input type="hidden" id="sh-edit-id">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Estimasi Kedatangan Material</label>
+                        <input type="date" id="sh-edit-est" class="w-full text-xs border border-gray-300 px-3 py-2 rounded focus:border-amber-500 outline-none text-gray-800 font-bold bg-white shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Remarks (Catatan PPC ke Produksi)</label>
+                        <textarea id="sh-edit-remarks" placeholder="Tambahkan catatan khusus terkait material ini..." class="w-full text-xs h-24 p-3 border border-gray-300 rounded focus:border-amber-500 outline-none shadow-sm resize-none"></textarea>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
+                    <button onclick="closeEditShModal()" class="px-4 py-2 rounded text-xs font-bold text-gray-500 hover:bg-gray-200 transition">Batal</button>
+                    <button onclick="saveEditSh()" class="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded shadow-md text-xs font-bold flex items-center gap-2 transition"><i data-lucide="save" class="w-3.5 h-3.5"></i> Simpan Perubahan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CAPTCHA DELETE MODAL -->
+        <div id="captcha-delete-modal" class="fixed inset-0 bg-gray-900/80 z-[10006] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-red-200">
+                <div class="px-5 py-4 border-b border-red-200 bg-red-50 flex justify-between items-center">
+                    <h3 class="font-black text-red-900 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5"></i> Konfirmasi Penghapusan</h3>
+                    <button onclick="closeCaptchaModal()" class="text-red-400 hover:text-red-600 transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+                <div class="p-6 flex flex-col gap-4 text-center">
+                    <p class="text-xs text-gray-600 font-bold">Tindakan ini permanen. Ketik kode di bawah untuk melanjutkan:</p>
+                    <div class="bg-gray-100 py-3 rounded-lg border border-gray-200">
+                        <span id="captcha-text" class="text-2xl font-black text-gray-800 tracking-widest select-none"></span>
+                    </div>
+                    <input type="text" id="captcha-input" placeholder="Ketik kode di sini..." class="w-full text-center text-lg font-bold border border-gray-300 px-3 py-2.5 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none text-gray-800 bg-white shadow-inner uppercase">
+                </div>
+                <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
+                    <button onclick="closeCaptchaModal()" class="px-4 py-2 rounded-lg text-xs font-bold text-gray-500 hover:bg-gray-200 transition">Batal</button>
+                    <button onclick="verifyCaptcha()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg shadow-md text-xs font-bold flex items-center gap-2 transition"><i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Sekarang</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SH DETAIL MODAL (KLIK BARIS) -->
+        <div id="sh-detail-modal" class="fixed inset-0 bg-gray-900/80 z-[10002] hidden flex items-center justify-center p-4 lg:p-8 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-200">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
+                    <h3 class="font-black text-gray-800 text-lg flex items-center gap-2"><i data-lucide="info" class="w-5 h-5 text-amber-500"></i> Detail Material Shortage</h3>
+                    <button onclick="closeShDetailModal()" class="text-gray-400 hover:text-red-500 bg-white border shadow-sm p-1.5 rounded transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+                <div class="flex-1 overflow-auto p-6" id="sh-detail-content">
+                    <!-- JS Inject -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ROCKET INPUT MODAL -->
+        <div id="rocket-input-modal" class="fixed inset-0 bg-gray-900/80 z-[9999] hidden flex flex-col items-center justify-center p-4 lg:p-10 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-200">
+                <div class="px-5 py-4 border-b border-pink-200 bg-pink-50 flex justify-between items-center shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-pink-600 text-white p-2 rounded-lg"><i data-lucide="rocket" class="w-5 h-5"></i></div>
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800 tracking-tight leading-none">Tetapkan Assy Rocket</h3>
+                            <span class="text-[10px] text-pink-700 font-bold bg-pink-100 px-2 py-0.5 rounded mt-1 inline-block">Validasi & Override STWC Database Bersih</span>
+                        </div>
+                    </div>
+                    <button onclick="closeRocketModal()" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+                
+                <div class="p-4 bg-white border-b border-gray-100 shrink-0 flex flex-col gap-3">
+                    <div class="flex flex-col gap-1 w-full">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase">List Assy & WP (Format: ASSY WP pemisah spasi)</label>
+                            <button onclick="openRocketSelectModal()" class="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1 border border-indigo-200 rounded font-bold shadow-sm transition flex items-center gap-1"><i data-lucide="list-plus" class="w-3 h-3"></i> Select Assy</button>
+                        </div>
+                        <textarea id="rocket-manual-input" class="w-full text-xs h-20 p-2 border border-gray-300 rounded focus:border-pink-500 outline-none shadow-sm" placeholder="Contoh Paste Excel atau ketik manual:\n12345678 A\n87654321 E"></textarea>
+                    </div>
+                    <button onclick="validateRocketData()" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-8 rounded shadow flex items-center justify-center gap-2 transition w-full md:w-auto self-center mt-2"><i data-lucide="check-circle-2" class="w-4 h-4"></i> Validasi List Manual</button>
+                </div>
+
+                <div class="flex-1 overflow-auto p-0 bg-gray-50">
+                    <table class="excel-table w-full whitespace-nowrap bg-white">
+                        <thead class="sticky top-0 shadow-sm z-10 bg-gray-100">
+                            <tr>
+                                <th class="w-12 text-center">AKSI</th>
+                                <th class="w-32 text-center">PRIORITAS (WAJIB)</th>
+                                <th class="w-20">PERIODE</th>
+                                <th class="text-left w-48">ASSY NO TERVALIDASI</th>
+                                <th class="w-24 text-center">WP</th>
+                                <th class="w-24 text-center">STATUS DB</th>
+                                <th class="w-20 text-center text-indigo-600">SISA QTY</th>
+                                <th class="w-32 text-center">REMARKS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rocket-validation-tbody" class="divide-y divide-gray-100">
+                            <tr><td colspan="8" class="text-center p-8 text-gray-400 font-medium">Input list Assy + WP, lalu klik Validasi, atau gunakan tombol Select Assy.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="p-4 border-t border-gray-200 bg-white flex justify-between items-center shrink-0">
+                    <div id="rocket-validation-summary" class="text-[10px] font-bold text-gray-500">Total Validasi: 0 Assy</div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex flex-col">
+                            <label class="text-[9px] font-bold text-gray-500 uppercase mb-0.5">Target STWC (Wajib)</label>
+                            <input type="date" id="rocket-stwc-input" class="text-xs border border-gray-300 px-2 py-1.5 rounded focus:border-pink-500 outline-none text-gray-700 bg-white shadow-sm">
+                        </div>
+                        <button onclick="saveRocketData()" class="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition flex items-center gap-2 h-full mt-3.5"><i data-lucide="rocket" class="w-4 h-4"></i> Simpan ke Rocket</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROCKET SELECT ASSY MODAL -->
+        <div id="rocket-select-modal" class="fixed inset-0 bg-gray-900/80 z-[10005] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-full max-h-[85vh] flex flex-col overflow-hidden border border-gray-200">
+                <div class="px-5 py-4 border-b border-indigo-200 bg-indigo-50 flex justify-between items-center shrink-0">
+                    <h3 class="font-black text-indigo-900 flex items-center gap-2"><i data-lucide="list-plus" class="w-5 h-5"></i> Pilih Assy untuk Rocket</h3>
+                    <button onclick="closeRocketSelectModal()" class="text-indigo-400 hover:text-red-500 hover:bg-white p-1 rounded transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+                <div class="p-3 border-b border-gray-200 bg-white flex gap-3 shrink-0">
+                    <div class="flex-1 relative">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                        <input type="text" id="rs-search-assy" placeholder="Cari Assy..." onkeyup="filterRocketSelect()" class="w-full text-xs pl-9 pr-3 py-2 border border-gray-300 rounded focus:border-indigo-500 outline-none shadow-sm">
+                    </div>
+                    <div class="flex-1 relative">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                        <input type="text" id="rs-search-wp" placeholder="Cari WP..." onkeyup="filterRocketSelect()" class="w-full text-xs pl-9 pr-3 py-2 border border-gray-300 rounded focus:border-indigo-500 outline-none shadow-sm">
+                    </div>
+                </div>
+                <div class="flex-1 overflow-auto bg-gray-50/50 p-0">
+                    <table class="w-full text-[10px] whitespace-nowrap border-collapse text-left excel-table">
+                        <thead class="bg-gray-100 text-gray-600 sticky top-0 shadow-sm z-10 font-bold uppercase">
+                            <tr>
+                                <th class="p-2 w-24 text-center">Status</th>
+                                <th class="p-2">Assy No</th>
+                                <th class="p-2 w-24 text-center">WP</th>
+                                <th class="p-2 w-24 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rocket-select-tbody" class="divide-y divide-gray-200 bg-white">
+                            <!-- JS Injected -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -750,7 +988,7 @@
             isFirebaseActive = true;
         }
 
-        async function saveDB(key, data) {
+        async function saveDB(key, data, progressCb) {
             if (!isFirebaseActive) return;
             try { 
                 const serializedData = JSON.stringify(data); 
@@ -781,7 +1019,8 @@
                             await new Promise(r => setTimeout(r, 1500));
                         }
                     }
-                    await new Promise(resolve => setTimeout(resolve, 400));
+                    if(progressCb) progressCb(Math.round(((i + 1) / chunksCount) * 100));
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
 
                 let retriesMetaEnd = 3;
@@ -830,7 +1069,7 @@
             } catch(e) { return null; }
         }
 
-        async function syncMasterToCloud() {
+        async function syncMasterToCloud(globalProgressCb) {
             let groups = {};
             globalMasterData.forEach(m => {
                 let f = m._sourceFile || 'unknown_master.xlsx';
@@ -838,15 +1077,18 @@
                 groups[f].push(m);
             });
             let validFiles = Object.keys(groups);
-            for(let f of validFiles) {
-                await saveDB('master_file_' + f, groups[f]);
+            for(let i=0; i<validFiles.length; i++) {
+                let f = validFiles[i];
+                await saveDB('master_file_' + f, groups[f], (pct) => {
+                    if(globalProgressCb) globalProgressCb(Math.round(((i * 100) + pct) / validFiles.length));
+                });
                 if(!uploadedMasterFiles.includes(f)) uploadedMasterFiles.push(f);
             }
             uploadedMasterFiles = uploadedMasterFiles.filter(f => validFiles.includes(f));
             await saveDB('uploaded_master_files', uploadedMasterFiles);
         }
 
-        async function syncWipToCloud() {
+        async function syncWipToCloud(globalProgressCb) {
             let groups = {};
             globalWipData.forEach(m => {
                 let f = m._sourceFile || 'unknown_wip.xlsx';
@@ -854,8 +1096,11 @@
                 groups[f].push(m);
             });
             let validFiles = Object.keys(groups);
-            for(let f of validFiles) {
-                await saveDB('wip_file_' + f, groups[f]);
+            for(let i=0; i<validFiles.length; i++) {
+                let f = validFiles[i];
+                await saveDB('wip_file_' + f, groups[f], (pct) => {
+                    if(globalProgressCb) globalProgressCb(Math.round(((i * 100) + pct) / validFiles.length));
+                });
                 if(!uploadedWipFiles.includes(f)) uploadedWipFiles.push(f);
             }
             uploadedWipFiles = uploadedWipFiles.filter(f => validFiles.includes(f));
@@ -863,8 +1108,69 @@
         }
 
         // ==========================================
-        // 2. GLOBALS & HELPERS
+        // 2. GLOBALS & HELPERS (Termasuk Auth & PIN)
         // ==========================================
+        const AUTH_PROFILES = {
+            '110603': 'Adysti E.A.',
+            '050205': 'MCL',
+            '010625': 'PPIC',
+            '111111': 'Luthfi D.C'
+        };
+
+        let activeUserPin = null;
+        let pendingAuthCallback = null;
+        let pendingAllowedPins = [];
+
+        window.requireAccess = function(allowedPins, callback) {
+            if (activeUserPin && allowedPins.includes(activeUserPin)) {
+                callback();
+            } else {
+                pendingAllowedPins = allowedPins;
+                pendingAuthCallback = callback;
+                document.getElementById('auth-pin-input').value = '';
+                document.getElementById('auth-modal').classList.remove('hidden');
+                setTimeout(() => document.getElementById('auth-pin-input').focus(), 100);
+            }
+        };
+
+        window.closeAuthModal = function() {
+            document.getElementById('auth-modal').classList.add('hidden');
+            pendingAuthCallback = null;
+            pendingAllowedPins = [];
+        };
+
+        window.submitAuth = function() {
+            let pin = document.getElementById('auth-pin-input').value;
+            if (pendingAllowedPins.includes(pin)) {
+                activeUserPin = pin;
+                let userName = AUTH_PROFILES[pin];
+                showToast(`Akses Diberikan. Halo, ${userName}!`, 'success');
+                closeAuthModal();
+                updateGreetings();
+                if (pendingAuthCallback) pendingAuthCallback();
+            } else {
+                showToast('PIN Salah atau Akses Ditolak!', 'error');
+            }
+        };
+
+        window.logoutAuth = function() {
+            activeUserPin = null;
+            updateGreetings();
+            switchTab('overview');
+            showToast('Sesi diakhiri.', 'info');
+        };
+
+        window.updateGreetings = function() {
+            const userName = activeUserPin ? AUTH_PROFILES[activeUserPin] : null;
+            const greetHtml = userName ? `<div class="flex items-center gap-2 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"><span class="text-[10px] text-gray-700 font-bold">Halo, <span class="text-brand-600">${userName}</span></span><button onclick="logoutAuth()" class="text-[9px] bg-red-50 text-red-600 px-2 py-0.5 rounded hover:bg-red-100 font-bold transition shadow-sm">Logout</button></div>` : '';
+            
+            safeSetHTML('greet-master', greetHtml);
+            safeSetHTML('greet-input', greetHtml);
+            safeSetHTML('greet-sh', greetHtml);
+            safeSetHTML('greet-rocket', greetHtml);
+            safeSetHTML('greet-control', greetHtml);
+        };
+
         let globalMasterData = []; 
         let globalWipData = [];    
         let globalShMaterials = [];
@@ -878,6 +1184,7 @@
 
 	let globalChatData = [];
         let lastReadChatCount = 0;
+        let globalAssyRocket = [];
 
         let uploadedMasterFiles = [];
         let uploadedWipFiles = [];
@@ -1256,6 +1563,7 @@
             globalDelayPWKey = await loadDB('global_delay_key');
             masterHeaders = sanitizeHeaders(await loadDB('master_headers'));
             masterHeaders.forEach(h => masterHeadersSet.add(h));
+	    globalAssyRocket = (await loadDB('assy_rocket')) || [];
 
 	    let readChat = await loadDB('last_read_chat');
             lastReadChatCount = readChat ? parseInt(readChat) : 0;
@@ -1297,13 +1605,13 @@
         }
 
         function switchTab(tabId) {
-            ['overview', 'report', 'control', 'sh', 'master', 'input'].forEach(id => {
+            ['overview', 'report', 'control', 'sh', 'rocket', 'master', 'input'].forEach(id => {
                 let view = document.getElementById(`view-${id}`); if(view) view.classList.add('hidden');
                 let btn = document.getElementById(`btn-tab-${id}`);
                 if(btn) {
                     if(id === 'overview') btn.className = "px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-500 hover:text-gray-800 border border-transparent";
                     else if(id === 'master' || id === 'input') btn.className = `px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 flex items-center gap-1.5`;
-                    else btn.className = "px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800";
+                    else btn.className = id === 'rocket' ? "px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-pink-600 flex items-center gap-1" : "px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800";
                 }
             });
 
@@ -1314,13 +1622,14 @@
             if(activeBtn) {
                 if(tabId === 'overview') activeBtn.className = "px-3 py-1.5 rounded-md text-xs font-semibold transition bg-brand-50 text-brand-700 border border-brand-200 shadow-sm";
                 else if(tabId === 'master' || tabId === 'input') activeBtn.className = "px-3 py-1.5 rounded-md text-xs font-semibold transition text-white bg-indigo-600 shadow flex items-center gap-1.5";
-                else activeBtn.className = "px-3 py-1.5 rounded text-xs font-semibold transition bg-white shadow-sm text-gray-800 border border-gray-200";
+                else activeBtn.className = tabId === 'rocket' ? "px-3 py-1.5 rounded text-xs font-semibold transition bg-pink-100 shadow-sm text-pink-700 border border-pink-200 flex items-center gap-1" : "px-3 py-1.5 rounded text-xs font-semibold transition bg-white shadow-sm text-gray-800 border border-gray-200";
             }
 
             if(tabId === 'overview') renderOverviewDashboard();
             if(tabId === 'report') renderReportWIP();
             if(tabId === 'control') { renderControlPeriodeTabs(); renderControlOutstanding(); }
             if(tabId === 'sh') renderShMaterials();
+            if(tabId === 'rocket') renderRocketTable();
             if(tabId === 'master') { safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy'); renderUploadedFiles(); }
             if(tabId === 'input') { updateInputStats(); renderUploadedFiles(); }
             lucide.createIcons();
@@ -1520,6 +1829,10 @@
                             mappedHeaders.forEach(h => { if(h) masterHeadersSet.add(h); });
 
                             for (let r = headerIndex + 1; r < jsonData.length; r++) {
+                                if (r % 3000 === 0) {
+                                    setLoaderState('Membaca File Master...', `Memproses baris ${r.toLocaleString()} / ${jsonData.length.toLocaleString()}`, Math.floor((r/jsonData.length)*100), `File ${i+1} dari ${files.length}`);
+                                    await new Promise(resolve => setTimeout(resolve, 0));
+                                }
                                 const row = jsonData[r]; if(!row || row.length === 0) continue;
                                 let obj = {};
                                 mappedHeaders.forEach((h, index) => { 
@@ -1566,8 +1879,13 @@
             
             try {
                 await saveDB('master_headers', masterHeaders);
-                await syncMasterToCloud();
+                await syncMasterToCloud((pct) => {
+                    setLoaderState('Menyimpan ke Cloud...', 'Sinkronisasi Master Data', pct, 'Proses Upload Database');
+                });
                 
+                setLoaderState('Menyelesaikan...', 'Merender tampilan UI', 99, '');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
                 try { setupControlHeaders(); } catch(e){}
                 updateInputStats(); updateGlobalThresholdUI(); renderUploadedFiles();
                 
@@ -1630,6 +1948,10 @@
                         if(!headers[2] || String(headers[2]).trim() === '') headers[2] = 'LINE';
                         
                         for (let r = headerIndex + 1; r < jsonData.length; r++) {
+                            if (r % 3000 === 0) {
+                                setLoaderState('Membaca Report WIP...', `Memproses baris ${r.toLocaleString()} / ${jsonData.length.toLocaleString()}`, Math.floor((r/jsonData.length)*100), `File ${i+1}/${files.length}`);
+                                await new Promise(resolve => setTimeout(resolve, 0));
+                            }
                             const row = jsonData[r]; if(!row || row.length === 0 || !row[0]) continue;
                             let obj = {}; 
                             headers.forEach((cleanH, idx) => { 
@@ -1704,8 +2026,12 @@
             }
 
             try {
-                await syncWipToCloud();
-                await syncMasterToCloud(); // Save potentially new Auto-Inserted rows
+                await syncWipToCloud((pct) => {
+                    setLoaderState('Menyimpan WIP ke Cloud...', 'Sinkronisasi Data Harian', Math.floor(pct/2), 'Tahap 1 dari 2');
+                });
+                await syncMasterToCloud((pct) => {
+                    setLoaderState('Memperbarui Master Data...', 'Sinkronisasi Auto-Insert Rows', 50 + Math.floor(pct/2), 'Tahap 2 dari 2');
+                }); 
                 await saveDB('last_wip_date', todayStr);
                 
                 updateInputStats(); renderUploadedFiles();
@@ -1812,6 +2138,28 @@
             }
         }
 
+        window.attemptUpdateCutoff = function(selectEl) {
+            let newVal = selectEl.value;
+            // Kembalikan visual ke nilai awal sebelum proses Auth selesai
+            selectEl.value = globalCutoffPWKey || selectEl.options[0].value; 
+            
+            requireAccess(['110603', '111111'], () => {
+                selectEl.value = newVal; // Terapkan nilai baru karena auth berhasil
+                updateCutoffThreshold(newVal);
+            });
+        };
+
+        window.attemptUpdateDelay = function(selectEl) {
+            let newVal = selectEl.value;
+            // Kembalikan visual ke nilai awal sebelum proses Auth selesai
+            selectEl.value = globalDelayPWKey || selectEl.options[0].value; 
+            
+            requireAccess(['110603', '111111'], () => {
+                selectEl.value = newVal; // Terapkan nilai baru karena auth berhasil
+                updateDelayThreshold(newVal);
+            });
+        };
+
         async function updateCutoffThreshold(val) { globalCutoffPWKey = val; await saveDB('global_cutoff_key', val); refreshDashboards(); }
         async function updateDelayThreshold(val) { globalDelayPWKey = val; await saveDB('global_delay_key', val); refreshDashboards(); }
 
@@ -1828,7 +2176,7 @@
 
             const overlay = document.getElementById('loading-overlay');
             if(overlay) overlay.classList.remove('hidden');
-            setLoaderState('Menghitung Ulang...', 'Auto-Expand SH & Validasi Tanggal', 50, '');
+            setLoaderState('Menghitung Ulang...', 'Auto-Expand SH & Validasi Tanggal', 0, '');
 
             // ==========================================
             // MESIN AUTO-EXPAND SH 'SEKARANG' (SETERUSNYA)
@@ -1885,7 +2233,16 @@
             globalMasterData.forEach(masterRow => {
                 let uid = masterRow._uid;
                 
-                let stwcTime = parseIndoDate(masterRow['STWC']);
+                // Cek apakah Assy ini termasuk Rocket
+                let actualStwc = masterRow['STWC'];
+                let isRocket = false;
+                let rocketMatch = globalAssyRocket.find(r => r.assy === superCleanAssy(masterRow.ASSY) && r.wp === superCleanAssy(masterRow.WP) && r.periode === masterRow.PERIODE);
+                if(rocketMatch) {
+                    actualStwc = rocketMatch.stwc;
+                    isRocket = true;
+                }
+
+                let stwcTime = parseIndoDate(actualStwc);
                 let diffDays = 0;
                 if(stwcTime > 0) {
                     let stwcDateObj = new Date(stwcTime);
@@ -1926,8 +2283,12 @@
             }
 
             try {
-                await syncMasterToCloud();
+                await syncMasterToCloud((pct) => {
+                    setLoaderState('Update Database...', 'Sinkronisasi Override Status Master', 20 + Math.floor(pct * 0.7), 'Tahap Sinkronisasi');
+                });
                 await saveDB('daily_history', dailyHistory);
+                setLoaderState('Menyelesaikan...', 'Merender ulang UI', 99, '');
+                await new Promise(r => setTimeout(r, 100));
 
                 if(overlay) overlay.classList.add('hidden');
                 refreshDashboards();
@@ -2396,7 +2757,7 @@
                         let assyCount = sh.targetUids ? sh.targetUids.length : 0;
                         
                         shHtml += `
-                        <div class="p-2 border rounded ${bg} transition shadow-sm flex flex-col gap-1.5 cursor-default hover:scale-[1.01]">
+                        <div onclick="openShDetailModal(${sh.id})" class="p-2 border rounded ${bg} transition shadow-sm flex flex-col gap-1.5 cursor-pointer hover:shadow-md hover:scale-[1.02]">
                             <div class="flex justify-between items-center w-full text-[9px]">
                                 <span class="font-bold text-gray-800 truncate pr-1" title="${sh.partName}">${sh.partName || '-'}</span>
                                 ${statusBadge}
@@ -2937,28 +3298,16 @@
 
             if(container) {
                 let shItemsHtml = globalShMaterials.map(m => {
-                    let impacts = {};
-                    if(m.targetUids) {
-                        m.targetUids.forEach(uid => {
-                            let parts = uid.split('_');
-                            if(parts.length >= 3) {
-                                let per = parts[1];
-                                let wp = getWPP(parts[2]);
-                                let key = per + ' WPP ' + wp;
-                                impacts[key] = (impacts[key] || 0) + 1;
-                            }
-                        });
-                    }
-                    let impactStr = Object.keys(impacts).map(k => `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-[9px] font-medium mr-1 inline-block mb-1">${k}: <strong class="text-gray-800">${impacts[k]} Assy</strong></span>`).join('');
+                    let detailBtn = `<button onclick="window.openShDetailModal(${m.id})" class="bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded shadow-sm text-[9px] font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap mx-auto"><i data-lucide="list" class="w-3.5 h-3.5"></i> Lihat Detail Assy (${m.targetUids ? m.targetUids.length : 0})</button>`;
                     
                     return `
                     <tr class="text-[11px] border-b border-gray-200 hover:bg-gray-50">
-                        <td class="p-2.5 font-black text-gray-800 align-top">${m.partName}</td>
-                        <td class="p-2.5 text-center text-gray-500 font-bold align-top">${m.type}</td>
-                        <td class="p-2.5 text-center font-bold text-gray-600 align-top">${m.tanggalSH}</td>
-                        <td class="p-2.5 text-center align-top">${m.tanggalKedatangan ? '<span class="text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Arrived ('+m.tanggalKedatangan+')</span>' : '<span class="text-red-500 font-black animate-pulse bg-red-50 px-2 py-0.5 rounded border border-red-100">🔴 OPEN / DELAY</span>'}</td>
-                        <td class="p-2.5 text-left align-top min-w-[200px] leading-tight">${impactStr}</td>
-                        <td class="p-2.5 text-right text-indigo-700 font-black align-top">${m.targetUids ? m.targetUids.length : 0} Assy<br><span class="text-[9px] text-gray-500">CCT: ${(m.totalCct || 0).toLocaleString()}</span></td>
+                        <td class="p-2.5 font-black text-gray-800 align-middle">${m.partName}</td>
+                        <td class="p-2.5 text-center text-gray-500 font-bold align-middle">${m.type}</td>
+                        <td class="p-2.5 text-center font-bold text-gray-600 align-middle">${m.tanggalSH}</td>
+                        <td class="p-2.5 text-center align-middle">${m.tanggalKedatangan ? '<span class="text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Arrived ('+m.tanggalKedatangan+')</span>' : '<span class="text-red-500 font-black animate-pulse bg-red-50 px-2 py-0.5 rounded border border-red-100">🔴 OPEN / DELAY</span>'}</td>
+                        <td class="p-2.5 text-center align-middle">${detailBtn}</td>
+                        <td class="p-2.5 text-right text-indigo-700 font-black align-middle">${m.targetUids ? m.targetUids.length : 0} Assy<br><span class="text-[9px] text-gray-500">CCT: ${(m.totalCct || 0).toLocaleString()}</span></td>
                     </tr>
                 `}).join('');
 
@@ -3257,10 +3606,12 @@
             let htmlString = "";
             pagedData.forEach((row, idx) => {
                 let bgClass = ''; let badge = '';
+                let isRocket = globalAssyRocket.some(r => r.assy === superCleanAssy(row.ASSY) && r.wp === superCleanAssy(row.WP) && r.periode === row.PERIODE);
+
                 if(row._status === 'CLOSED') { bgClass = 'bg-emerald-50'; badge = `<span class="bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">CLOSED PP</span>`; }
-                else if(row._status === 'CND 3') { bgClass = 'bg-red-50'; badge = `<span class="bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded animate-pulse shadow-sm">CND 3</span>`; }
-                else if(row._status === 'CND 2') { bgClass = 'bg-amber-50'; badge = `<span class="bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded shadow-sm">CND 2</span>`; }
-                else { badge = `<span class="bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded shadow-sm">OPEN</span>`; }
+                else if(row._status === 'CND 3') { bgClass = isRocket ? 'bg-pink-200' : 'bg-red-50'; badge = `<span class="bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded animate-pulse shadow-sm">CND 3</span>`; }
+                else if(row._status === 'CND 2') { bgClass = isRocket ? 'bg-pink-200' : 'bg-amber-50'; badge = `<span class="bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded shadow-sm">CND 2</span>`; }
+                else { bgClass = isRocket ? 'bg-pink-100' : ''; badge = `<span class="bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded shadow-sm">OPEN</span>`; }
 
                 htmlString += `<tr class="hover:bg-gray-200 ${bgClass} transition-colors border-b border-gray-100 cursor-context-menu" oncontextmenu="forceCloseAssy(event, '${row._uid}')" title="Klik Kanan baris ini untuk Force Close">`;
                 
@@ -3275,6 +3626,9 @@
                     if (col === 'PROBLEM') {
                         cellData = window.getShBadgeHtml(row._uid, row.ASSY);
                         colClass = "text-center align-middle";
+                    } else if (col === 'STWC' && isRocket) {
+                        let rocketMatch = globalAssyRocket.find(r => r.assy === superCleanAssy(row.ASSY) && r.wp === superCleanAssy(row.WP) && r.periode === row.PERIODE);
+                        cellData = `<div class="flex items-center gap-1.5 justify-center"><i data-lucide="rocket" class="w-3.5 h-3.5 text-pink-600"></i><span class="text-pink-700 font-black">${rocketMatch.stwc}</span></div>`;
                     } else {
                         cellData = row[col] !== undefined ? row[col] : '';
                     }
@@ -3524,19 +3878,30 @@
             renderShValidationTable();
         }
 
-        window.saveShAsShortage = async function() {
+        window.saveShAsShortage = function() { window.openShConfirmModal(); };
+        window.openShConfirmModal = function() {
             let activeData = window.tempShValidatedData.filter(x => x.status !== 'CLOSED');
             if(activeData.length === 0) { showToast("Tidak ada data aktif untuk ditetapkan sebagai SH.", "warning"); return; }
-            
+            let itemId = document.getElementById('sh-item-id-input').value.trim();
+            if(!itemId) { showToast("Nama Part / Item ID wajib diisi sebagai identitas.", "error"); return; }
+
+            document.getElementById('sh-confirm-est').value = '';
+            document.getElementById('sh-confirm-remarks').value = '';
+            document.getElementById('sh-confirm-modal').classList.remove('hidden');
+        }
+        
+        window.closeShConfirmModal = function() { document.getElementById('sh-confirm-modal').classList.add('hidden'); }
+
+        window.confirmSaveSh = async function() {
+            let activeData = window.tempShValidatedData.filter(x => x.status !== 'CLOSED');
+            if(activeData.length === 0) { showToast("Tidak ada data aktif untuk ditetapkan sebagai SH.", "warning"); return; }
             let pType = document.getElementById('sh-type-input').value.trim();
             let itemId = document.getElementById('sh-item-id-input').value.trim();
+            if(!itemId) { showToast("Nama Part / Item ID wajib diisi sebagai identitas.", "error"); return; }
             let pStart = document.getElementById('sh-per-start').value;
             let pEnd = document.getElementById('sh-per-end').value;
-            let estDate = document.getElementById('sh-estimasi-input') ? document.getElementById('sh-estimasi-input').value : '';
-
-            if(!itemId) {
-                showToast("Nama Part / Item ID wajib diisi sebagai identitas.", "error"); return;
-            }
+            let estDate = '';
+            let remarks = '';
 
             let uids = activeData.map(x => x.uid);
             let grandCct = activeData.reduce((sum, curr) => sum + curr.totalCct, 0);
@@ -3548,20 +3913,24 @@
                 startPeriod: pStart, 
                 endPeriod: pEnd,
                 targetUids: uids, 
-                affectedAssys: window.tempShCleanAssyList || [], // Simpan blueprint raw list untuk fitur Seterusnya
+                affectedAssys: window.tempShCleanAssyList || [], 
                 totalCct: grandCct,
                 tanggalSH: getTodayDateStr().split('-').reverse().join('-'), 
                 estimasiKedatangan: estDate || null,
+                remarks: remarks || null,
                 id: Date.now(), 
                 tanggalKedatangan: null
             };
 
             globalShMaterials.push(newSh);
             try {
-                setLoaderState('Mengunci Shortage...', 'Menyimpan relasi UID Assy', 50, '');
+                setLoaderState('Mengunci Shortage...', 'Menyimpan relasi UID Assy', 0, '');
                 document.getElementById('loading-overlay').classList.remove('hidden');
                 
-                await saveDB('sh_materials', globalShMaterials);
+                await saveDB('sh_materials', globalShMaterials, (pct) => setLoaderState('Mengunci Shortage...', 'Upload data Shortage ke Cloud', pct, 'Menyimpan...'));
+                setLoaderState('Memperbarui UI...', 'Merender Tabel & Dashboard', 99, '');
+                await new Promise(r => setTimeout(r, 100));
+
                 renderShMaterials();
                 
                 if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
@@ -3571,31 +3940,214 @@
                 closeShInputModal();
                 document.getElementById('loading-overlay').classList.add('hidden');
                 showToast("Shortage Berhasil Ditetapkan ke Dashboard!", "success");
-            } catch(e) { document.getElementById('loading-overlay').classList.add('hidden'); }
-        }
-
-        window.deleteShMaterial = async function(id) {
-            if(confirm("Hapus Riwayat Shortage ini? Status List Assy akan kembali normal ke sistem.")) {
-                globalShMaterials = globalShMaterials.filter(sh => sh.id !== id);
-                try {
-                    setLoaderState('Menghapus...', 'Mengembalikan status data', 50, '');
-                    document.getElementById('loading-overlay').classList.remove('hidden');
-                    
-                    await saveDB('sh_materials', globalShMaterials);
-                    renderShMaterials();
-                    
-                    if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
-                    if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
-                    if(!document.getElementById('view-control').classList.contains('hidden')) renderControlOutstanding();
-
-                    document.getElementById('loading-overlay').classList.add('hidden');
-                    showToast("Riwayat Shortage berhasil dihapus.", "success");
-                } catch(e) {
-                    document.getElementById('loading-overlay').classList.add('hidden');
-                    showToast("Gagal menghapus data.", "error");
-                }
+            } catch(e) { 
+                console.error(e);
+                document.getElementById('loading-overlay').classList.add('hidden'); 
+                showToast("Gagal menyimpan data Shortage.", "error");
             }
+        };
+
+        window.openEditShModal = function(id) {
+            let sh = globalShMaterials.find(x => x.id === id);
+            if(!sh) return;
+            document.getElementById('sh-edit-id').value = sh.id;
+            document.getElementById('sh-edit-est').value = sh.estimasiKedatangan || '';
+            document.getElementById('sh-edit-remarks').value = sh.remarks || '';
+            document.getElementById('sh-edit-modal').classList.remove('hidden');
+        };
+
+        window.closeEditShModal = function() { document.getElementById('sh-edit-modal').classList.add('hidden'); };
+
+        window.saveEditSh = async function() {
+            let id = parseInt(document.getElementById('sh-edit-id').value);
+            let shIndex = globalShMaterials.findIndex(x => x.id === id);
+            if(shIndex === -1) return;
+
+            globalShMaterials[shIndex].estimasiKedatangan = document.getElementById('sh-edit-est').value || null;
+            globalShMaterials[shIndex].remarks = document.getElementById('sh-edit-remarks').value.trim() || null;
+
+            try {
+                setLoaderState('Menyimpan...', 'Memperbarui Estimasi & Remarks', 50, '');
+                document.getElementById('loading-overlay').classList.remove('hidden');
+                await saveDB('sh_materials', globalShMaterials);
+                renderShMaterials();
+                
+                if(!document.getElementById('sh-detail-modal').classList.contains('hidden')) {
+                    openShDetailModal(id);
+                }
+
+                closeEditShModal();
+                document.getElementById('loading-overlay').classList.add('hidden');
+                showToast("Perubahan berhasil disimpan!", "success");
+            } catch(e) {
+                document.getElementById('loading-overlay').classList.add('hidden');
+                showToast("Gagal menyimpan perubahan.", "error");
+            }
+        };
+
+        window.openShDetailModal = function(id) {
+            let sh = globalShMaterials.find(x => x.id === id);
+            if(!sh) return;
+            
+            let isArrived = sh.tanggalKedatangan !== null;
+            let statusBadge = isArrived ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-black border border-emerald-200">ARRIVED (${sh.tanggalKedatangan})</span>` : `<span class="bg-red-100 text-red-600 px-2 py-1 rounded font-black border border-red-200 animate-pulse">OPEN</span>`;
+            
+            let estStr = sh.estimasiKedatangan ? sh.estimasiKedatangan.split('-').reverse().join('-') : '<span class="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded border border-red-200 animate-pulse uppercase tracking-wider">Belum Konfirmasi MCL</span>';
+            let editBtn = `<button onclick="requireAccess(['050205', '110603', '111111'], () => openEditShModal(${sh.id}))" class="text-amber-500 hover:text-amber-700 hover:bg-amber-100 p-1 rounded transition"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>`;
+            
+            let impactDetailsHtml = '';
+            if(sh.targetUids && sh.targetUids.length > 0) {
+                let assyList = [];
+                sh.targetUids.forEach(uid => {
+                    let m = globalMasterData.find(x => x._uid === uid);
+                    if(m) assyList.push(m);
+                });
+                assyList.sort((a,b) => parseIndoDate(a.STWC) - parseIndoDate(b.STWC));
+                
+                impactDetailsHtml = `
+                <div class="max-h-52 overflow-y-auto border border-gray-200 rounded-lg shadow-sm">
+                    <table class="w-full text-[10px] text-left whitespace-nowrap">
+                        <thead class="bg-gray-100 sticky top-0 shadow-sm z-10">
+                            <tr>
+                                <th class="p-2 border-b border-gray-200">Periode</th>
+                                <th class="p-2 border-b border-gray-200">Assy No</th>
+                                <th class="p-2 border-b border-gray-200">WP</th>
+                                <th class="p-2 border-b border-gray-200 text-center">STWC</th>
+                                <th class="p-2 border-b border-gray-200 text-right">QTY DB</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">`;
+                
+                assyList.forEach(m => {
+                    impactDetailsHtml += `
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="p-2 font-bold text-gray-700">${m.PERIODE||'-'}</td>
+                                <td class="p-2 font-black text-gray-900">${m.ASSY||'-'}</td>
+                                <td class="p-2 font-mono text-gray-500">${m.WP||'-'}</td>
+                                <td class="p-2 text-center font-bold text-gray-700">${m.STWC||'-'}</td>
+                                <td class="p-2 text-right font-black text-indigo-600">${m.QTY||0}</td>
+                            </tr>`;
+                });
+                impactDetailsHtml += `</tbody></table></div>`;
+            } else {
+                impactDetailsHtml = '<span class="text-xs text-gray-500 italic">Tidak ada data assy terdampak.</span>';
+            }
+            
+            let btnAction = isArrived ? '' : `<button onclick="confirmArrival(${sh.id}); closeShDetailModal();" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded shadow font-bold text-xs flex items-center gap-2"><i data-lucide="truck" class="w-4 h-4"></i> Set Kedatangan</button>`;
+
+            let html = `
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 class="text-2xl font-black text-gray-800">${sh.partName}</h2>
+                        <p class="text-sm font-bold text-gray-500 mt-1">ID: ${sh.itemId} <span class="mx-2">|</span> Kategori: <span class="text-amber-600">${sh.type}</span></p>
+                    </div>
+                    ${statusBadge}
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Rentang Periode DB</span>
+                        <strong class="text-sm text-gray-800">${sh.startPeriod} - ${sh.endPeriod}</strong>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Tanggal Ditetapkan (Input)</span>
+                        <strong class="text-sm text-gray-800">${sh.tanggalSH}</strong>
+                    </div>
+                    <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 relative group">
+                        <div class="flex justify-between items-start">
+                            <span class="text-[10px] uppercase font-bold text-amber-600 block mb-1">Estimasi Kedatangan</span>
+                            ${editBtn}
+                        </div>
+                        <strong class="text-sm text-amber-900">${estStr}</strong>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-xl border border-purple-200">
+                        <span class="text-[10px] uppercase font-bold text-purple-600 block mb-1">Total CCT Tertahan</span>
+                        <strong class="text-sm text-purple-900">${(sh.totalCct||0).toLocaleString()}</strong>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <span class="text-[10px] uppercase font-bold text-gray-400 block mb-2">Remarks (PPC ke Produksi)</span>
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 text-sm text-gray-700 min-h-[60px] whitespace-pre-wrap">${sh.remarks || '<i>Tidak ada catatan.</i>'}</div>
+                </div>
+                
+                <div class="mb-6">
+                    <span class="text-[10px] uppercase font-bold text-gray-400 block mb-2">Detail Assy Terdampak Shortage</span>
+                    <div>${impactDetailsHtml}</div>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                    <button onclick="requireAccess(['110603', '111111'], () => { promptCaptchaDelete('SH', ${sh.id}); closeShDetailModal(); })" class="text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded font-bold text-xs transition">Hapus Data / Batal</button>
+                    ${btnAction}
+                </div>
+            `;
+            document.getElementById('sh-detail-content').innerHTML = html;
+            lucide.createIcons();
+            document.getElementById('sh-detail-modal').classList.remove('hidden');
         }
+        window.closeShDetailModal = function() { document.getElementById('sh-detail-modal').classList.add('hidden'); }
+
+        let pendingDeleteType = null;
+        let pendingDeleteId = null;
+        let currentCaptchaCode = '';
+
+        window.promptCaptchaDelete = function(type, id) {
+            pendingDeleteType = type;
+            pendingDeleteId = id;
+            currentCaptchaCode = 'HAPUS-' + (Math.floor(Math.random() * 9000) + 1000);
+            
+            document.getElementById('captcha-text').innerText = currentCaptchaCode;
+            document.getElementById('captcha-input').value = '';
+            document.getElementById('captcha-delete-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('captcha-input').focus(), 100);
+        };
+
+        window.closeCaptchaModal = function() {
+            document.getElementById('captcha-delete-modal').classList.add('hidden');
+            pendingDeleteType = null;
+            pendingDeleteId = null;
+            currentCaptchaCode = '';
+        };
+
+        window.verifyCaptcha = function() {
+            let input = document.getElementById('captcha-input').value.trim().toUpperCase();
+            if(input !== currentCaptchaCode) {
+                showToast("Kode Captcha Tidak Sesuai!", "error");
+                document.getElementById('captcha-input').value = '';
+                document.getElementById('captcha-input').focus();
+                return;
+            }
+            
+            closeCaptchaModal();
+            if(pendingDeleteType === 'SH') window.executeDeleteSh(pendingDeleteId);
+            else if(pendingDeleteType === 'ROCKET') window.executeDeleteRocket(pendingDeleteId);
+        };
+
+        window.executeDeleteSh = async function(id) {
+            globalShMaterials = globalShMaterials.filter(sh => sh.id !== id);
+            try {
+                setLoaderState('Menghapus...', 'Mengembalikan status data', 0, '');
+                document.getElementById('loading-overlay').classList.remove('hidden');
+                
+                await saveDB('sh_materials', globalShMaterials, (pct) => setLoaderState('Menghapus...', 'Update Database Cloud', pct, 'Proses Delete'));
+                setLoaderState('Memperbarui UI...', 'Merender ulang Dashboard', 99, '');
+                await new Promise(r => setTimeout(r, 100));
+
+                renderShMaterials();
+                
+                if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
+                if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
+                if(!document.getElementById('view-control').classList.contains('hidden')) renderControlOutstanding();
+
+                document.getElementById('loading-overlay').classList.add('hidden');
+                showToast("Riwayat Shortage berhasil dihapus.", "success");
+            } catch(e) {
+                console.error(e);
+                document.getElementById('loading-overlay').classList.add('hidden');
+                showToast("Gagal menghapus data.", "error");
+            }
+        };
+        
 
         function confirmArrival(id) {
             let dateStr = prompt("Tanggal Part Aktual Datang (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
@@ -3610,41 +4162,328 @@
             }
         }
 
-        function renderShMaterials() {
-            if(globalShMaterials.length === 0) { safeSetHTML('sh-cards-container', `<div class="text-gray-400 text-center col-span-full mt-4">Belum ada data Shortage Material terdaftar.</div>`); return; }
-            let html = '';
-            globalShMaterials.forEach(sh => {
-                let isDatang = sh.tanggalKedatangan !== null;
-                let bgStyle = isDatang ? 'bg-white border-green-200' : 'bg-white border-red-200';
-                let actionBtn = isDatang ? `<span class="text-[9px] font-bold text-green-600 flex items-center justify-center gap-1 bg-green-50 py-1 rounded border border-green-100"><i data-lucide="check-circle" class="w-2.5 h-2.5"></i> Arrived: ${sh.tanggalKedatangan}</span>` : `<button onclick="confirmArrival(${sh.id})" class="w-full text-[9px] font-bold bg-gray-800 text-white py-1 rounded hover:bg-gray-900 transition flex items-center justify-center gap-1"><i data-lucide="truck" class="w-2.5 h-2.5"></i> Konfirmasi Kedatangan</button>`;
-                let assyCount = sh.targetUids ? sh.targetUids.length : 0;
+        window.renderShMaterials = function() {
+            const tbody = document.getElementById('sh-table-body');
+            if(!tbody) return;
 
-                let estStr = sh.estimasiKedatangan ? sh.estimasiKedatangan.split('-').reverse().join('-') : 'Belum diatur';
-                
-                html += `
-                    <div class="bento-box p-3 flex flex-col ${bgStyle} relative overflow-hidden shadow-sm hover:shadow transition">
-                        <div class="absolute top-0 left-0 w-full h-1.5 ${isDatang ? 'bg-green-500' : 'bg-red-500'}"></div>
-                        <div class="flex justify-between items-start mb-2 mt-1">
-                            <div><h4 class="font-bold text-gray-800 text-[11px] leading-tight">${sh.partName || 'Part SH'}</h4><span class="text-[8px] font-semibold text-gray-500">ID: ${sh.itemId || '-'} | Tipe: ${sh.type}</span></div>
-                            <div class="flex items-center gap-1">
-                                <span class="px-1.5 py-0.5 rounded bg-red-100 border border-red-200 text-[8px] font-bold text-red-800 shadow-sm">${assyCount} Assy</span>
-                                <button onclick="deleteShMaterial(${sh.id})" class="text-gray-400 hover:text-red-600 bg-white shadow-sm border border-gray-200 p-0.5 rounded transition hover:bg-red-50" title="Hapus Riwayat SH"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 rounded p-2 mb-3 text-[9px] space-y-1 flex-1 border border-gray-100">
-                            <div class="flex justify-between"><span class="text-gray-500 font-medium">Periode Terdampak</span><span class="font-bold text-gray-800">${sh.startPeriod || ''} - ${sh.endPeriod || ''}</span></div>
-                            <div class="flex justify-between"><span class="text-gray-500 font-medium">Total CCT Terdampak</span><span class="font-bold text-red-600">${(sh.totalCct || 0).toLocaleString()}</span></div>
-                            <div class="flex justify-between"><span class="text-gray-500 font-medium">Tgl ID Dibuat</span><span class="font-bold text-gray-600">${sh.tanggalSH}</span></div>
-                            <div class="flex justify-between"><span class="text-gray-500 font-medium">Estimasi Kedatangan</span><span class="font-bold text-amber-600">${estStr}</span></div>
-                        </div>
-                        <div class="mt-auto">${actionBtn}</div>
-                    </div>
-                `;
+            let filterType = document.getElementById('filter-sh-type') ? document.getElementById('filter-sh-type').value : 'ALL';
+            
+            let filteredSh = globalShMaterials;
+            if(filterType !== 'ALL') {
+                filteredSh = filteredSh.filter(sh => sh.type === filterType);
+            }
+
+            if(filteredSh.length === 0) { 
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400 font-medium">Tidak ada data SH.</td></tr>`; 
+                return; 
+            }
+            
+            // Sort: OPEN on top, then by Date
+            filteredSh.sort((a,b) => {
+                if (a.tanggalKedatangan === null && b.tanggalKedatangan !== null) return -1;
+                if (a.tanggalKedatangan !== null && b.tanggalKedatangan === null) return 1;
+                return b.id - a.id; 
             });
-            safeSetHTML('sh-cards-container', html);
+
+            let html = '';
+            filteredSh.forEach(sh => {
+                let isDatang = sh.tanggalKedatangan !== null;
+                let bgRow = isDatang ? 'bg-emerald-100 hover:bg-emerald-200 cursor-pointer transition' : 'bg-red-50 hover:bg-red-100 cursor-pointer transition';
+                let statBadge = isDatang ? `<span class="bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded font-black text-[9px] border border-emerald-300">ARRIVED</span>` : `<span class="bg-red-200 text-red-800 px-2 py-0.5 rounded font-black text-[9px] border border-red-300 animate-pulse">OPEN</span>`;
+                let estStr = sh.estimasiKedatangan ? sh.estimasiKedatangan.split('-').reverse().join('-') : '<span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[8px] font-bold border border-red-200 animate-pulse">Belum Konfirmasi MCL</span>';
+                let assyCount = sh.targetUids ? sh.targetUids.length : 0;
+                let cctStr = (sh.totalCct||0).toLocaleString();
+
+                html += `
+                <tr class="border-b border-gray-100 transition ${bgRow}" onclick="openShDetailModal(${sh.id})">
+                    <td class="p-3 align-top">
+                        <div class="font-black text-gray-800 text-[11px]">${sh.partName}</div>
+                        <div class="text-[9px] text-gray-500 font-bold mt-0.5">ID: ${sh.itemId}</div>
+                    </td>
+                    <td class="p-3 text-center font-bold text-gray-600 text-[10px] align-top">${sh.type}</td>
+                    <td class="p-3 text-center font-mono text-gray-700 text-[10px] align-top">${sh.tanggalSH}</td>
+                    <td class="p-3 text-center font-bold text-amber-700 text-[10px] align-top">${estStr}</td>
+                    <td class="p-3 text-center align-top">${statBadge}</td>
+                    <td class="p-3 text-right align-top">
+                        <div class="font-black text-indigo-700 text-[10px]">${assyCount} Assy</div>
+                        <div class="text-[9px] text-gray-500 font-bold mt-0.5">CCT: ${cctStr}</div>
+                    </td>
+                    <td class="p-3 max-w-[200px] truncate text-[9px] text-gray-600 italic align-top">${sh.remarks || '-'}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        // ==========================================
+        // ROCKET LOGIC
+        // ==========================================
+        window.tempRocketValidated = [];
+
+        window.openRocketModal = function() {
+            document.getElementById('rocket-stwc-input').value = '';
+            document.getElementById('rocket-manual-input').value = '';
+            safeSetHTML('rocket-validation-tbody', '<tr><td colspan="8" class="text-center p-8 text-gray-400 font-medium">Input list Assy + WP (Pemisah Spasi), lalu klik Validasi, atau gunakan Select Assy.</td></tr>');
+            safeSetText('rocket-validation-summary', 'Total Validasi: 0 Assy');
+            window.tempRocketValidated = [];
+            document.getElementById('rocket-input-modal').classList.remove('hidden');
+        }
+        window.closeRocketModal = function() { document.getElementById('rocket-input-modal').classList.add('hidden'); }
+
+        // Modal Select
+        window.openRocketSelectModal = function() {
+            document.getElementById('rs-search-assy').value = '';
+            document.getElementById('rs-search-wp').value = '';
+            
+            let html = '';
+            let validMaster = globalMasterData.filter(m => m._status !== 'CLOSED');
+            
+            validMaster.sort((a,b) => parseIndoDate(a.STWC) - parseIndoDate(b.STWC));
+
+            validMaster.forEach(m => {
+                let badge = m._status === 'CND 3' ? '<span class="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold animate-pulse shadow-sm">CND 3</span>' : 
+                            m._status === 'CND 2' ? '<span class="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold shadow-sm">CND 2</span>' :
+                            '<span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold shadow-sm">OPEN</span>';
+                
+                let isSelected = window.tempRocketValidated.some(x => x.uid === m._uid);
+                let btn = isSelected ? 
+                    `<button disabled class="bg-gray-100 text-gray-400 border border-gray-200 px-3 py-1 rounded text-[9px] font-bold shadow-sm cursor-not-allowed">Selected</button>` : 
+                    `<button onclick="selectAssyForRocket('${m._uid}', this)" class="bg-white hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200 px-3 py-1 rounded text-[9px] font-bold transition shadow-sm">Select</button>`;
+
+                html += `
+                <tr class="rs-row hover:bg-indigo-50 transition border-b border-gray-100">
+                    <td class="p-2 text-center align-middle">${badge}</td>
+                    <td class="p-2 font-bold text-gray-800 align-middle rs-assy">${m.ASSY||'-'}</td>
+                    <td class="p-2 text-center font-mono text-gray-500 align-middle rs-wp">${m.WP||'-'}</td>
+                    <td class="p-2 text-center align-middle">
+                        ${btn}
+                    </td>
+                </tr>`;
+            });
+
+            if(validMaster.length === 0) html = '<tr><td colspan="4" class="text-center p-6 text-gray-400">Tidak ada data aktif.</td></tr>';
+            
+            document.getElementById('rocket-select-tbody').innerHTML = html;
+            document.getElementById('rocket-select-modal').classList.remove('hidden');
+        }
+
+        window.closeRocketSelectModal = function() { document.getElementById('rocket-select-modal').classList.add('hidden'); }
+
+        window.filterRocketSelect = function() {
+            let filterAssy = document.getElementById('rs-search-assy').value.toUpperCase();
+            let filterWp = document.getElementById('rs-search-wp').value.toUpperCase();
+            let rows = document.querySelectorAll('.rs-row');
+            
+            rows.forEach(r => {
+                let assy = (r.querySelector('.rs-assy').innerText || '').toUpperCase();
+                let wp = (r.querySelector('.rs-wp').innerText || '').toUpperCase();
+                if(assy.includes(filterAssy) && wp.includes(filterWp)) r.style.display = '';
+                else r.style.display = 'none';
+            });
+        }
+
+        window.selectAssyForRocket = function(uid, btnEl) {
+            let m = globalMasterData.find(x => x._uid === uid);
+            if(m && !window.tempRocketValidated.some(x => x.uid === uid)) {
+                let qty = parseFloat(m['QTY'] || 0);
+                window.tempRocketValidated.push({
+                    uid: m._uid, periode: m.PERIODE, assy: m.ASSY, wp: m.WP, status: m._status, dbQty: qty,
+                    cleanAssy: superCleanAssy(m.ASSY), cleanWp: superCleanAssy(m.WP), prioritas: '', remarks: ''
+                });
+                
+                if(btnEl) {
+                    btnEl.disabled = true;
+                    btnEl.className = "bg-gray-100 text-gray-400 border border-gray-200 px-3 py-1 rounded text-[9px] font-bold shadow-sm cursor-not-allowed";
+                    btnEl.innerText = "Selected";
+                }
+                
+                renderRocketValidationTable();
+                showToast(`${m.ASSY} - ${m.WP} langsung ditambahkan!`, 'success');
+            }
+        }
+
+        window.validateRocketData = function() {
+            let manualInput = document.getElementById('rocket-manual-input').value;
+            let lines = manualInput.split(/[\n]+/).filter(l => l.trim() !== '');
+            if(lines.length === 0) { showToast('List Assy & WP kosong!', 'warning'); return; }
+
+            let pairs = lines.map(l => {
+                let parts = l.split(/\s+/).filter(p => p.trim() !== ''); // Pemisah Spasi Otomatis
+                if(parts.length >= 2) return { a: superCleanAssy(parts[0]), w: superCleanAssy(parts[1]) };
+                return null;
+            }).filter(p => p !== null);
+
+            pairs.forEach(p => {
+                let matches = globalMasterData.filter(m => superCleanAssy(m.ASSY) === p.a && superCleanAssy(m.WP) === p.w);
+                matches.forEach(m => {
+                    let qty = parseFloat(m['QTY'] || 0);
+                    // Prevent duplicate validation internally
+                    if(!window.tempRocketValidated.some(x => x.uid === m._uid)) {
+                        window.tempRocketValidated.push({
+                            uid: m._uid, periode: m.PERIODE, assy: m.ASSY, wp: m.WP, status: m._status, dbQty: qty,
+                            cleanAssy: p.a, cleanWp: p.w, prioritas: '', remarks: ''
+                        });
+                    }
+                });
+            });
+
+            document.getElementById('rocket-manual-input').value = ''; // Kosongkan Input Manual
+            renderRocketValidationTable();
+        }
+
+        window.renderRocketValidationTable = function() {
+            let html = '';
+            if(window.tempRocketValidated.length === 0) {
+                html = '<tr><td colspan="8" class="text-center p-8 text-gray-400 font-medium">Data kosong.</td></tr>';
+            } else {
+                window.tempRocketValidated.forEach((d, i) => {
+                    let isClosed = d.status === 'CLOSED';
+                    let badge = isClosed ? '<span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">CLOSED</span>' : '<span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">OPEN</span>';
+                    let btn = `<button onclick="removeRocketTemp('${d.uid}')" class="text-gray-400 hover:text-red-600 bg-white border px-2 py-1 rounded shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>`;
+                    
+                    let selU = d.prioritas === 'Urgent' ? 'selected' : '';
+                    let selTU = d.prioritas === 'Top Urgent' ? 'selected' : '';
+                    let selR = d.prioritas === 'Rocket' ? 'selected' : '';
+
+                    let selectHtml = `
+                        <select onchange="updateTempRocketStatus(${i}, this.value)" class="w-full text-[10px] border border-gray-300 rounded px-2 py-1 outline-none focus:border-pink-500 bg-white cursor-pointer font-bold">
+                            <option value="">- Pilih Status -</option>
+                            <option value="Urgent" class="text-amber-600" ${selU}>Urgent</option>
+                            <option value="Top Urgent" class="text-orange-600" ${selTU}>Top Urgent</option>
+                            <option value="Rocket" class="text-pink-600" ${selR}>Rocket</option>
+                        </select>
+                    `;
+
+                    let remarkHtml = `<input type="text" placeholder="Remarks..." value="${d.remarks || ''}" onchange="updateTempRocketRemarks(${i}, this.value)" class="w-full text-[10px] border border-gray-300 rounded px-2 py-1 outline-none focus:border-pink-500 bg-white font-medium">`;
+                    
+                    html += `
+                    <tr class="border-b border-gray-100 hover:bg-pink-50 transition">
+                        <td class="p-2 text-center align-middle">${btn}</td>
+                        <td class="p-2 text-center align-middle">${selectHtml}</td>
+                        <td class="p-2 font-bold text-gray-800 text-center align-middle">${d.periode}</td>
+                        <td class="p-2 font-bold text-gray-800 align-middle">${d.assy}</td>
+                        <td class="p-2 text-center text-gray-500 font-mono align-middle">${d.wp}</td>
+                        <td class="p-2 text-center text-xs align-middle">${badge}</td>
+                        <td class="p-2 text-center text-indigo-600 font-bold align-middle">${d.dbQty}</td>
+                        <td class="p-2 text-center align-middle">${remarkHtml}</td>
+                    </tr>`;
+                });
+            }
+            safeSetHTML('rocket-validation-tbody', html);
+            safeSetText('rocket-validation-summary', `Total Validasi: ${window.tempRocketValidated.length} Assy`);
             lucide.createIcons();
         }
 
+        window.updateTempRocketStatus = function(index, val) {
+            if(window.tempRocketValidated[index]) window.tempRocketValidated[index].prioritas = val;
+        }
+
+        window.updateTempRocketRemarks = function(index, val) {
+            if(window.tempRocketValidated[index]) window.tempRocketValidated[index].remarks = val;
+        }
+
+        window.removeRocketTemp = function(uid) {
+            window.tempRocketValidated = window.tempRocketValidated.filter(x => x.uid !== uid);
+            renderRocketValidationTable();
+        }
+
+        window.saveRocketData = async function() {
+            if(window.tempRocketValidated.length === 0) { showToast('Tidak ada data valid', 'warning'); return; }
+            
+            let stwcInput = document.getElementById('rocket-stwc-input').value;
+            if(!stwcInput) { showToast('Target STWC Wajib diisi!', 'error'); return; }
+
+            let missingStatus = window.tempRocketValidated.some(x => !x.prioritas);
+            if(missingStatus) { showToast('Semua Assy wajib dipilih Status/Prioritasnya!', 'error'); return; }
+
+            let targetStwcFormatted = stwcInput.split('-').reverse().join('-');
+            
+            setLoaderState('Menyimpan...', 'Menyiapkan Data Rocket', 0, '');
+            document.getElementById('loading-overlay').classList.remove('hidden');
+
+            window.tempRocketValidated.forEach(r => {
+                let existingIndex = globalAssyRocket.findIndex(x => x.assy === r.cleanAssy && x.wp === r.cleanWp && x.periode === r.periode);
+                if(existingIndex !== -1) {
+                    globalAssyRocket[existingIndex].stwc = targetStwcFormatted;
+                    globalAssyRocket[existingIndex].prioritas = r.prioritas;
+                    globalAssyRocket[existingIndex].remarks = r.remarks || '';
+                } else {
+                    globalAssyRocket.push({ id: Date.now()+Math.random(), assy: r.cleanAssy, wp: r.cleanWp, stwc: targetStwcFormatted, periode: r.periode, prioritas: r.prioritas, remarks: r.remarks || '', created: getTodayDateStr() });
+                }
+            });
+
+            await saveDB('assy_rocket', globalAssyRocket, (pct) => setLoaderState('Menyimpan...', 'Upload Rocket ke Cloud', pct, 'Tahap 1 dari 2'));
+            await recalculateValidation(); // Ini mengaplikasikan perubahan Rocket STWC
+            renderRocketTable();
+            closeRocketModal();
+            
+            document.getElementById('loading-overlay').classList.add('hidden');
+            showToast('Assy Rocket berhasil ditetapkan!', 'success');
+        }
+
+        window.executeDeleteRocket = async function(id) {
+            globalAssyRocket = globalAssyRocket.filter(r => r.id !== id);
+            await saveDB('assy_rocket', globalAssyRocket);
+            await recalculateValidation();
+            renderRocketTable();
+            
+            if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
+            if(!document.getElementById('view-control').classList.contains('hidden')) renderControlOutstanding();
+            
+            showToast('Status Rocket dihapus', 'success');
+        }
+
+        window.renderRocketTable = function() {
+            let html = '';
+            let filterVal = document.getElementById('filter-rocket-status').value;
+            
+            let activeRocket = globalAssyRocket;
+            if(filterVal !== 'ALL') {
+                activeRocket = activeRocket.filter(r => r.prioritas === filterVal);
+            }
+
+            if(activeRocket.length === 0) {
+                html = '<tr><td colspan="9" class="text-center p-8 text-gray-400 font-medium">Data kosong.</td></tr>';
+            } else {
+                // Sortir berdasarkan tanggal STWC target
+                let sorted = [...activeRocket].sort((a,b) => parseIndoDate(a.stwc) - parseIndoDate(b.stwc));
+                
+                sorted.forEach(r => {
+                    let mMatch = globalMasterData.find(m => superCleanAssy(m.ASSY) === r.assy && superCleanAssy(m.WP) === r.wp && m.PERIODE === r.periode);
+                    let dbQty = 0; let statusWip = 'UNKNOWN'; let isClosed = false;
+                    let dispAssy = r.assy; let dispWp = r.wp;
+                    if(mMatch) {
+                        dbQty = mMatch.QTY || 0;
+                        statusWip = mMatch._status;
+                        isClosed = statusWip === 'CLOSED';
+                        dispAssy = mMatch.ASSY;
+                        dispWp = mMatch.WP;
+                    }
+                    
+                    let bgRow = isClosed ? 'bg-gray-50 opacity-60' : 'hover:bg-pink-50';
+                    let statBadge = isClosed ? '<span class="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">CLOSED</span>' : `<span class="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">${statusWip}</span>`;
+                    
+                    let prioritasColor = r.prioritas === 'Rocket' ? 'bg-pink-100 text-pink-700 border-pink-200' :
+                                         r.prioritas === 'Top Urgent' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                         'bg-amber-100 text-amber-700 border-amber-200';
+                    let prioritasBadge = `<span class="text-[9px] font-bold ${prioritasColor} border px-2 py-0.5 rounded shadow-sm">${r.prioritas || 'Urgent'}</span>`;
+
+                    html += `
+                    <tr class="border-b border-gray-100 transition ${bgRow}">
+                        <td class="p-2 text-center align-middle"><button onclick="requireAccess(['110603', '010625', '111111'], () => promptCaptchaDelete('ROCKET', ${r.id}))" class="text-gray-400 hover:text-red-600 bg-white border px-2 py-1 rounded shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>
+                        <td class="p-2 text-center align-middle">${prioritasBadge}</td>
+                        <td class="p-2 text-center text-pink-700 font-black align-middle"><i data-lucide="rocket" class="w-3 h-3 inline mr-1"></i> ${r.stwc}</td>
+                        <td class="p-2 text-center font-bold text-gray-600 align-middle">${r.periode}</td>
+                        <td class="p-2 font-black text-gray-800 align-middle">${dispAssy}</td>
+                        <td class="p-2 text-center font-mono text-gray-600 align-middle">${dispWp}</td>
+                        <td class="p-2 text-right font-bold text-indigo-700 align-middle">${dbQty}</td>
+                        <td class="p-2 text-center align-middle">${statBadge}</td>
+                        <td class="p-2 text-[9px] text-gray-600 align-middle max-w-[150px] truncate" title="${r.remarks || ''}">${r.remarks || '-'}</td>
+                    </tr>`;
+                });
+            }
+            safeSetHTML('rocket-table-body', html);
+            lucide.createIcons();
+        }
     </script>
 </body>
 </html>

@@ -3878,19 +3878,7 @@
             renderShValidationTable();
         }
 
-        window.saveShAsShortage = function() { window.openShConfirmModal(); };
-        window.openShConfirmModal = function() {
-            let activeData = window.tempShValidatedData.filter(x => x.status !== 'CLOSED');
-            if(activeData.length === 0) { showToast("Tidak ada data aktif untuk ditetapkan sebagai SH.", "warning"); return; }
-            let itemId = document.getElementById('sh-item-id-input').value.trim();
-            if(!itemId) { showToast("Nama Part / Item ID wajib diisi sebagai identitas.", "error"); return; }
-
-            document.getElementById('sh-confirm-est').value = '';
-            document.getElementById('sh-confirm-remarks').value = '';
-            document.getElementById('sh-confirm-modal').classList.remove('hidden');
-        }
-        
-        window.closeShConfirmModal = function() { document.getElementById('sh-confirm-modal').classList.add('hidden'); }
+        window.saveShAsShortage = function() { window.confirmSaveSh(); };
 
         window.confirmSaveSh = async function() {
             let activeData = window.tempShValidatedData.filter(x => x.status !== 'CLOSED');
@@ -3967,10 +3955,15 @@
             globalShMaterials[shIndex].remarks = document.getElementById('sh-edit-remarks').value.trim() || null;
 
             try {
-                setLoaderState('Menyimpan...', 'Memperbarui Estimasi & Remarks', 50, '');
+                setLoaderState('Menyimpan...', 'Memperbarui Estimasi & Remarks', 0, '');
                 document.getElementById('loading-overlay').classList.remove('hidden');
-                await saveDB('sh_materials', globalShMaterials);
+                
+                await saveDB('sh_materials', globalShMaterials, (pct) => setLoaderState('Menyimpan...', 'Update Database Cloud', pct, 'Proses Edit'));
+                
                 renderShMaterials();
+                if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
+                if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
+                if(!document.getElementById('view-control').classList.contains('hidden')) renderControlOutstanding();
                 
                 if(!document.getElementById('sh-detail-modal').classList.contains('hidden')) {
                     openShDetailModal(id);
@@ -4033,7 +4026,7 @@
                 impactDetailsHtml = '<span class="text-xs text-gray-500 italic">Tidak ada data assy terdampak.</span>';
             }
             
-            let btnAction = isArrived ? '' : `<button onclick="confirmArrival(${sh.id}); closeShDetailModal();" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded shadow font-bold text-xs flex items-center gap-2"><i data-lucide="truck" class="w-4 h-4"></i> Set Kedatangan</button>`;
+            let btnAction = isArrived ? '' : `<button onclick="confirmArrival(${sh.id})" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded shadow font-bold text-xs flex items-center gap-2"><i data-lucide="truck" class="w-4 h-4"></i> Set Kedatangan</button>`;
 
             let html = `
                 <div class="flex justify-between items-start mb-6">
@@ -4149,18 +4142,31 @@
         };
         
 
-        function confirmArrival(id) {
-            let dateStr = prompt("Tanggal Part Aktual Datang (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
-            if(dateStr) {
-                let item = globalShMaterials.find(x => x.id === id);
-                if(item) { 
-                    item.tanggalKedatangan = dateStr; 
-                    saveDB('sh_materials', globalShMaterials); 
-                    renderShMaterials(); renderReportWIP(); refreshDashboards(); 
-                    if(!document.getElementById('view-control').classList.contains('hidden')) renderControlOutstanding();
+        window.confirmArrival = function(id) {
+            requireAccess(['050205', '110603', '111111'], async () => {
+                let dateStr = prompt("Tanggal Part Aktual Datang (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+                if(dateStr) {
+                    let item = globalShMaterials.find(x => x.id === id);
+                    if(item) { 
+                        item.tanggalKedatangan = dateStr; 
+                        
+                        setLoaderState('Menyimpan...', 'Update Kedatangan Material', 0, '');
+                        document.getElementById('loading-overlay').classList.remove('hidden');
+                        
+                        await saveDB('sh_materials', globalShMaterials, (pct) => setLoaderState('Menyimpan...', 'Update Database Cloud', pct, 'Proses Set Kedatangan'));
+                        
+                        renderShMaterials(); 
+                        if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
+                        if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
+                        if(!document.getElementById('view-control').classList.contains('hidden')) renderControlOutstanding();
+                        
+                        closeShDetailModal();
+                        document.getElementById('loading-overlay').classList.add('hidden');
+                        showToast("Kedatangan Material Berhasil Ditetapkan!", "success");
+                    }
                 }
-            }
-        }
+            });
+        };
 
         window.renderShMaterials = function() {
             const tbody = document.getElementById('sh-table-body');

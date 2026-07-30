@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Monitoring WIP & Master Validation (Cloud Version)</title>
+    <title>E-WIP MONITORING FIFO & SHORTAGE</title>
+    <link rel="icon" href="assets/ewip.webp" type="image/png">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,9 +54,33 @@
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-        #loading-overlay { backdrop-filter: blur(4px); transition: opacity 0.3s; }
+        #loading-overlay { backdrop-filter: blur(8px); transition: opacity 0.5s ease; }
         .progress-bar-fill { transition: width 0.3s ease-out; }
         
+        @keyframes shine-progress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+        .animate-shine {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+            animation: shine-progress 1.2s infinite linear;
+        }
+        
+        #loading-notes-text { transition: opacity 0.4s ease-in-out; }
+
+        @keyframes duck-fall {
+            0% { transform: translateY(-10vh) rotate(-15deg) scale(0.8); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(35deg) scale(1.2); opacity: 0; }
+        }
+        .duck-rain {
+            position: fixed;
+            top: -10vh;
+            z-index: 99998;
+            pointer-events: none;
+            animation: duck-fall linear forwards;
+            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2));
+        }
+
         /* EXCEL TABLE STYLE */
         .excel-table { border-collapse: separate; border-spacing: 0; width: 100%; }
         .excel-table th, .excel-table td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 0.3rem 0.5rem; font-size: 11px; }
@@ -102,19 +127,69 @@
         </div>
     </div>
 
-    <!-- Loading Screen Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-gray-900/80 z-[99999] flex flex-col items-center justify-center">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
-            <div class="flex justify-center mb-5"><i data-lucide="star" class="w-12 h-12 text-amber-400 fill-amber-400 animate-spin"></i></div>
-            <h3 class="text-lg font-bold text-gray-800 mb-1" id="loading-title">Menghubungkan ke Cloud...</h3>
-            <p class="text-xs text-gray-500 mb-6" id="loading-desc">Membaca data dari server Firebase.</p>
-            <div class="w-full bg-gray-100 rounded-full h-3 mb-2 overflow-hidden border border-gray-200">
-                <div id="loading-bar" class="bg-brand-500 h-3 rounded-full progress-bar-fill w-0"></div>
+    <!-- Loading Screen Overlay (Full Glassmorphism + Dock Left/Right Layout) -->
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[99999] flex flex-col justify-between transition-opacity duration-500">
+        
+        <!-- Center Flex Wrapper (Docked Left & Right) -->
+        <div class="flex-1 flex flex-col md:flex-row items-center justify-between w-full px-8 md:px-16 lg:px-24 xl:px-32 gap-16">
+            
+            <!-- Left: Logos & Titles (Dock to Left) -->
+            <div class="flex flex-col items-start gap-4 shrink-0">
+                <div class="flex items-center gap-3 mb-2">
+                    <img src="assets/banshu-logo.webp" alt="Logo 1" onerror="this.style.display='none'" class="h-14 w-auto object-contain drop-shadow-md">
+                    <img src="assets/kinenta.webp" alt="Logo 2" onerror="this.style.display='none'" class="h-14 w-auto object-contain drop-shadow-md">
+                    <img src="assets/ewip.webp" alt="Logo 3" onerror="this.style.display='none'" class="h-14 w-auto object-contain drop-shadow-md">
+                </div>
+                <h1 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1.1] tracking-tight drop-shadow-lg">
+                    <span class="text-red-600">E</span>-WIP<br>
+                    MONITORING FIFO<br>
+                    & SHORTAGE
+                </h1>
             </div>
-            <div class="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                <span id="loading-pct">0%</span><span id="loading-rows">Menyinkronkan...</span>
+
+            <!-- Right: Random Notes & Skeleton (Dock to Right) -->
+            <div class="max-w-lg w-full shrink-0 md:pl-10">
+                <h3 class="text-gray-200 font-medium mb-3 text-lg drop-shadow-md">Notes:</h3>
+                
+                <!-- Skeleton Mode (Tampil Awal) -->
+                <div id="loading-notes-skeleton" class="flex flex-col gap-2.5 animate-pulse">
+                    <div class="h-3 bg-slate-700/50 rounded w-full"></div>
+                    <div class="h-3 bg-slate-700/50 rounded w-[90%]"></div>
+                    <div class="h-3 bg-slate-700/50 rounded w-[95%]"></div>
+                    <div class="h-3 bg-slate-700/50 rounded w-[70%]"></div>
+                </div>
+
+                <!-- Actual Notes Text -->
+                <div id="loading-notes-text" class="text-gray-200 text-sm md:text-base leading-relaxed text-justify hidden font-medium tracking-wide">
+                    Mempersiapkan lingkungan Cloud...
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Bottom: Progress Bar Area -->
+        <div class="w-full px-8 md:px-16 pb-8 pt-4 flex flex-col gap-2 relative">
+            <div class="flex flex-col mb-1 drop-shadow-md">
+                <span id="loading-title" class="text-white font-bold text-sm tracking-wide">Inisialisasi Sistem...</span>
+                <span id="loading-rows" class="text-slate-200 text-[10px] uppercase font-bold tracking-widest mt-0.5">Memuat UI...</span>
+            </div>
+            
+            <!-- Thin Shining Progress Bar -->
+            <div class="relative w-full h-[3px] bg-slate-800 rounded-full mt-2">
+                <div id="loading-bar" class="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full w-0 progress-bar-fill shadow-[0_0_10px_rgba(56,189,248,0.7)] overflow-hidden">
+                    <!-- Efek kilau putih berjalan -->
+                    <div class="absolute inset-0 w-full h-full animate-shine"></div>
+                </div>
+                
+                <!-- Percentage Badge (Mengikuti Ujung) -->
+                <div id="loading-badge" class="absolute top-[-26px] -ml-4 bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg transition-all duration-300 transform -translate-x-1/2" style="left: 0%;">
+                    0%
+                    <!-- Segitiga kecil ke bawah -->
+                    <div class="absolute bottom-[-3px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[3px] border-l-transparent border-r-[3px] border-r-transparent border-t-[3px] border-t-blue-500"></div>
+                </div>
             </div>
         </div>
+        
     </div>
 
     <!-- Drilldown Modal (List Assy Chart Click) -->
@@ -251,39 +326,46 @@
         </div>
     </div>
 
-    <!-- Navbar -->
-    <nav class="bg-white border-b border-bento-border px-4 py-2 flex items-center justify-between z-20 shrink-0 shadow-sm">
-        <div class="flex items-center gap-4">
+    <!-- Navbar (Header Image Full Stretch) -->
+    <nav class="relative border-b border-gray-300 px-4 py-3 flex items-center justify-between z-20 shrink-0 shadow-md bg-cover bg-center bg-no-repeat overflow-hidden" style="background-image: url('assets/header.webp');">
+        <!-- Backdrop ditipiskan (30%) agar gambar header.webp tidak tertutup warna putih -->
+        <div class="absolute inset-0 bg-white/30 backdrop-blur-[2px] z-0"></div>
+
+        <div class="flex items-center gap-4 relative z-10">
             <div class="flex items-center gap-2 mr-2">
-                <div class="bg-brand-500 text-white p-1.5 rounded-lg shadow-sm"><i data-lucide="cloud" class="w-4 h-4"></i></div>
-                <div>
-                    <h1 class="font-bold text-gray-800 text-sm leading-none tracking-tight">Executive WIP</h1>
-                    <span class="text-[9px] text-brand-600 font-bold uppercase tracking-wider">Cloud Synchronized</span>
+                <div class="flex items-center gap-1.5 shrink-0 bg-white/50 p-1 rounded-lg backdrop-blur-sm border border-white/50 shadow-sm">
+                    <img src="assets/banshu-logo.webp" alt="Logo 1" onerror="this.style.display='none'" class="h-6 w-auto object-contain drop-shadow-sm">
+                    <img src="assets/kinenta.webp" alt="Logo 2" onerror="this.style.display='none'" class="h-6 w-auto object-contain drop-shadow-sm">
+                    <img src="assets/ewip.webp" alt="Logo 3" onerror="this.style.display='none'" class="h-6 w-auto object-contain drop-shadow-sm">
+                </div>
+                <div class="border-l-2 border-gray-800/20 pl-2 ml-1 flex flex-col justify-center">
+                    <h1 class="font-black text-gray-900 text-sm leading-none tracking-tight drop-shadow-sm"><span class="text-red-600">E</span>-WIP</h1>
+                    <span class="text-[8px] text-gray-700 font-bold uppercase tracking-wider leading-none mt-0.5 drop-shadow-sm">Monitoring FIFO & Shortage</span>
                 </div>
             </div>
         </div>
 
-        <div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg hidden" id="nav-center-menus">
-<button onclick="openChatModal()" class="relative px-3 py-1.5 rounded-md text-xs font-semibold transition text-sky-700 bg-sky-100 border border-sky-200 hover:bg-sky-200 flex items-center gap-1.5 shadow-sm">
+        <div class="flex items-center gap-1 bg-white/60 backdrop-blur-md p-1 rounded-xl shadow-sm border border-white/60 relative z-10 hidden" id="nav-center-menus">
+            <button onclick="openChatModal()" class="relative px-3 py-1.5 rounded-md text-xs font-semibold transition text-sky-800 bg-sky-100 border border-sky-200 hover:bg-sky-200 flex items-center gap-1.5 shadow-sm">
                 <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
                 <span id="chat-badge" class="hidden absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white shadow-sm border border-white animate-pulse">0</span>
             </button>
-            <button id="btn-tab-overview" onclick="switchTab('overview')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-500 hover:text-gray-800 border border-transparent">Overview</button>
+            <button id="btn-tab-overview" onclick="switchTab('overview')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-600 hover:text-gray-900 border border-transparent">Overview</button>
             
-            <div class="w-px h-5 bg-gray-300 mx-1"></div>
-            <button onclick="recalculateValidation()" class="px-2 py-1.5 bg-brand-100 text-brand-700 hover:bg-brand-200 rounded text-[10px] font-bold shadow-sm transition flex items-center gap-1" title="Hitung ulang status Open/Closed/CND3 berdasarkan tanggal aktual"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Recalculate Validasi</button>
-            <div class="w-px h-5 bg-gray-300 mx-1"></div>
-            <button id="btn-tab-report" onclick="switchTab('report')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800">Resume Analisis</button>
-            <button id="btn-tab-control" onclick="switchTab('control')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800 flex items-center gap-1"> Database Bersih</button>
-            <button id="btn-tab-sh" onclick="switchTab('sh')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-gray-800">SH Material</button>
-            <button id="btn-tab-rocket" onclick="switchTab('rocket')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-500 hover:text-pink-600 flex items-center gap-1"><i data-lucide="rocket" class="w-3.5 h-3.5"></i> Assy Rocket</button>
+            <div class="w-px h-5 bg-gray-400 mx-1"></div>
+            <button onclick="recalculateValidation()" class="px-2 py-1.5 bg-brand-100 text-brand-800 hover:bg-brand-200 rounded text-[10px] font-bold shadow-sm transition flex items-center gap-1" title="Hitung ulang status Open/Closed/CND3 berdasarkan tanggal aktual"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>
+            <div class="w-px h-5 bg-gray-400 mx-1"></div>
+            <button id="btn-tab-report" onclick="switchTab('report')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-600 hover:text-gray-900">Resume Analisis</button>
+            <button id="btn-tab-control" onclick="switchTab('control')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-600 hover:text-gray-900 flex items-center gap-1"> Database Bersih</button>
+            <button id="btn-tab-sh" onclick="switchTab('sh')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-600 hover:text-gray-900">SH Material</button>
+            <button id="btn-tab-rocket" onclick="switchTab('rocket')" class="px-3 py-1.5 rounded text-xs font-semibold transition text-gray-600 hover:text-pink-700 flex items-center gap-1"><i data-lucide="rocket" class="w-3.5 h-3.5"></i> Assy Rocket</button>
         </div>
 
-        <div class="flex items-center gap-2">
-            <button id="btn-tab-master" onclick="requireAccess(['110603', '111111'], () => switchTab('master'))" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1.5">
+        <div class="flex items-center gap-2 relative z-10">
+            <button id="btn-tab-master" onclick="requireAccess(['110603', '111111'], () => switchTab('master'))" class="px-3 py-1.5 rounded-md text-xs font-bold transition text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1.5 shadow-sm">
                 <i data-lucide="library" class="w-3.5 h-3.5"></i> Master Data (MPP)
             </button>
-            <button id="btn-tab-input" onclick="requireAccess(['110603', '111111'], () => switchTab('input'))" class="px-3 py-1.5 rounded-md text-xs font-semibold transition text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 flex items-center gap-1.5">
+            <button id="btn-tab-input" onclick="requireAccess(['110603', '111111'], () => switchTab('input'))" class="px-3 py-1.5 rounded-md text-xs font-bold transition text-gray-800 bg-white hover:bg-gray-100 border border-gray-300 flex items-center gap-1.5 shadow-sm">
                 <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i> WIP Input (Harian)
             </button>
         </div>
@@ -1160,6 +1242,25 @@
             showToast('Sesi diakhiri.', 'info');
         };
 
+        window.lastDuckRainTime = 0;
+        window.triggerDuckRain = function() {
+            // Mencegah spam jika sedang hujan bebek
+            if(document.querySelectorAll('.duck-rain').length > 0) return;
+            
+            for(let i = 0; i < 40; i++) {
+                let duck = document.createElement('div');
+                duck.innerText = '🐤';
+                duck.className = 'duck-rain';
+                duck.style.left = (Math.random() * 100) + 'vw';
+                let duration = Math.random() * 2 + 1.5; // Jatuh dalam waktu 1.5s sampai 3.5s
+                duck.style.animationDuration = duration + 's';
+                duck.style.fontSize = (Math.random() * 1.5 + 1.5) + 'rem';
+                document.body.appendChild(duck);
+                
+                setTimeout(() => duck.remove(), duration * 1000); // Bersihkan setelah selesai jatuh
+            }
+        };
+
         window.updateGreetings = function() {
             const userName = activeUserPin ? AUTH_PROFILES[activeUserPin] : null;
             const greetHtml = userName ? `<div class="flex items-center gap-2 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"><span class="text-[10px] text-gray-700 font-bold">Halo, <span class="text-brand-600">${userName}</span></span><button onclick="logoutAuth()" class="text-[9px] bg-red-50 text-red-600 px-2 py-0.5 rounded hover:bg-red-100 font-bold transition shadow-sm">Logout</button></div>` : '';
@@ -1511,8 +1612,44 @@
         };
 
         // ==========================================
+        // ==========================================
         // 3. INIT & TAB LOGIC + AUTO RESET
         // ==========================================
+        
+        let notesIntervalId = null;
+        const RANDOM_NOTES = [
+            "Pastikan file Master Data (MPP) yang di-upload adalah versi terbaru agar validasi akurat.",
+            "Sistem E-WIP secara otomatis melakukan mapping WPP dan menyesuaikan target tanggal STWC.",
+            "Dampak Shortage (SH) akan diakumulasi ke seluruh List Assy yang terkait secara presisi.",
+            "Fitur Assy Rocket memungkinkan Override STWC khusus untuk list produksi yang mendesak.",
+            "Hindari penulisan spasi berlebih pada file Excel untuk mengurangi potensi error pembacaan.",
+            "Sinkronisasi Cloud memastikan semua user melihat data yang sama secara Real-Time.",
+            "Tips: Menekan Ctrl+Enter di menu Manajemen Review akan langsung mengirim pesan chat.",
+            "Fitur Delay & Cut-Off secara pintar menyeleksi Assy mana yang masih valid diproduksi."
+        ];
+
+        function startLoadingNotes() {
+            const skeleton = document.getElementById('loading-notes-skeleton');
+            const textEl = document.getElementById('loading-notes-text');
+            if(skeleton) skeleton.classList.add('hidden');
+            if(textEl) {
+                textEl.classList.remove('hidden');
+                textEl.innerText = RANDOM_NOTES[Math.floor(Math.random() * RANDOM_NOTES.length)];
+                
+                notesIntervalId = setInterval(() => {
+                    textEl.style.opacity = '0'; // Fade out
+                    setTimeout(() => {
+                        textEl.innerText = RANDOM_NOTES[Math.floor(Math.random() * RANDOM_NOTES.length)];
+                        textEl.style.opacity = '1'; // Fade in
+                    }, 400); 
+                }, 7000);
+            }
+        }
+
+        function stopLoadingNotes() {
+            if(notesIntervalId) clearInterval(notesIntervalId);
+        }
+
         window.onload = async function() {
             lucide.createIcons();
             Chart.register(ChartDataLabels);
@@ -1520,17 +1657,32 @@
 
             const overlay = document.getElementById('loading-overlay'); 
             if(overlay) overlay.classList.remove('hidden');
+            
+            // Atur progress awal
+            setLoaderState('Inisialisasi Sistem...', 'Menyiapkan modul aplikasi', 5, 'Starting...');
+            
+            // Matikan Skeleton dan mulai Random Notes setelah 1.5 detik inisialisasi awal
+            setTimeout(startLoadingNotes, 1500);
 
             if (!isFirebaseActive) {
                 showToast("Firebase Gagal Konek! Cek config API.", "error");
+                stopLoadingNotes();
                 if(overlay) overlay.classList.add('hidden');
                 switchTab('master'); return;
             }
             
-            // LOAD PER FILE
+            setLoaderState('Menghubungkan ke Cloud...', 'Memeriksa koneksi database', 10, 'Firebase Connected');
+
+            // LOAD PER FILE MASTER (Progress: 10% - 40%)
             uploadedMasterFiles = (await loadDB('uploaded_master_files')) || [];
             globalMasterData = []; let validMaster = [];
-            for(let f of uploadedMasterFiles) { let data = await loadDB('master_file_' + f); if(data && data.length > 0) { globalMasterData.push(...data); validMaster.push(f); } }
+            for(let i = 0; i < uploadedMasterFiles.length; i++) {
+                let f = uploadedMasterFiles[i];
+                let progress = 10 + Math.floor((i / uploadedMasterFiles.length) * 30);
+                setLoaderState('Memuat Master Data...', `Mengunduh list MPP: ${f}`, progress, `File ${i+1}/${uploadedMasterFiles.length}`);
+                let data = await loadDB('master_file_' + f); 
+                if(data && data.length > 0) { globalMasterData.push(...data); validMaster.push(f); } 
+            }
             uploadedMasterFiles = validMaster;
 
             if (globalMasterData.length === 0) {
@@ -1538,13 +1690,20 @@
                 if (legacyMaster && legacyMaster.length > 0) {
                     globalMasterData = legacyMaster;
                     await syncMasterToCloud();
-                    showToast("Sistem: Data Master lama berhasil dimigrasi ke Arsitektur Baru.", "success");
+                    showToast("Sistem: Data Master lama dimigrasi.", "success");
                 }
             }
 
+            // LOAD PER FILE WIP (Progress: 40% - 70%)
             uploadedWipFiles = (await loadDB('uploaded_wip_files')) || [];
             globalWipData = []; let validWip = [];
-            for(let f of uploadedWipFiles) { let data = await loadDB('wip_file_' + f); if(data && data.length > 0) { globalWipData.push(...data); validWip.push(f); } }
+            for(let i = 0; i < uploadedWipFiles.length; i++) {
+                let f = uploadedWipFiles[i];
+                let progress = 40 + Math.floor((i / uploadedWipFiles.length) * 30); 
+                setLoaderState('Memuat Data WIP...', `Mengunduh report harian: ${f}`, progress, `File ${i+1}/${uploadedWipFiles.length}`);
+                let data = await loadDB('wip_file_' + f); 
+                if(data && data.length > 0) { globalWipData.push(...data); validWip.push(f); } 
+            }
             uploadedWipFiles = validWip;
 
             if (globalWipData.length === 0) {
@@ -1552,23 +1711,28 @@
                 if (legacyWip && legacyWip.length > 0) {
                     globalWipData = legacyWip;
                     await syncWipToCloud();
-                    showToast("Sistem: Data WIP lama berhasil dimigrasi ke Arsitektur Baru.", "success");
+                    showToast("Sistem: Data WIP lama dimigrasi.", "success");
                 }
             }
 
+            setLoaderState('Menarik Konfigurasi...', 'Mendapatkan setting dan history', 75, 'Fetching Preferences');
             globalSTWCSettings = (await loadDB('stwc_settings')) || {};
             globalShMaterials = (await loadDB('sh_materials')) || [];
             dailyHistory = (await loadDB('daily_history')) || [];
             globalCutoffPWKey = await loadDB('global_cutoff_key');
             globalDelayPWKey = await loadDB('global_delay_key');
+            
+            setLoaderState('Validasi Header...', 'Memeriksa struktur data', 80, 'Checking Layout');
             masterHeaders = sanitizeHeaders(await loadDB('master_headers'));
             masterHeaders.forEach(h => masterHeadersSet.add(h));
-	    globalAssyRocket = (await loadDB('assy_rocket')) || [];
+            globalAssyRocket = (await loadDB('assy_rocket')) || [];
 
-	    let readChat = await loadDB('last_read_chat');
+            setLoaderState('Memuat Chat Log...', 'Sinkronisasi riwayat obrolan', 85, 'Fetching Chat');
+            let readChat = await loadDB('last_read_chat');
             lastReadChatCount = readChat ? parseInt(readChat) : 0;
             initChatListener();
 
+            setLoaderState('Validasi Harian...', 'Memeriksa pergantian hari', 90, 'Checking Date');
             let lastWipDate = await loadDB('last_wip_date');
             let todayStr = getTodayDateStr();
 
@@ -1578,6 +1742,8 @@
                 showToast("Hari baru dimulai! Data WIP kemarin telah dibersihkan otomatis.", "warning");
             }
 
+            setLoaderState('Menyiapkan Dashboard...', 'Merender antarmuka pengguna', 98, 'Finishing up');
+            
             if(globalMasterData.length > 0) {
                 updateWipDependencies(); updateInputStats(); updateGlobalThresholdUI(); renderUploadedFiles();
                 try { setupControlHeaders(); } catch(e) { console.error(e); }
@@ -1587,6 +1753,7 @@
                 switchTab('overview');
             } else { switchTab('master'); }
             
+            stopLoadingNotes();
             if(overlay) overlay.classList.add('hidden');
         };
 
@@ -1703,10 +1870,25 @@
         }
 
         function setLoaderState(title, desc, pct, rowsTxt) {
-            safeSetText('loading-title', title); safeSetText('loading-desc', desc);
-            document.getElementById('loading-bar').style.width = pct + '%'; 
-            safeSetText('loading-pct', pct + '%');
-            if(rowsTxt) safeSetText('loading-rows', rowsTxt);
+            safeSetText('loading-title', title); 
+            
+            // Gabungkan deskripsi dan status row agar lebih ringkas
+            let subText = desc || '';
+            if (rowsTxt && rowsTxt !== '') subText += ` | ${rowsTxt}`;
+            safeSetText('loading-rows', subText);
+
+            // Validasi Max 100%
+            let safePct = Math.min(100, Math.max(0, Math.floor(pct)));
+            
+            let loadingBar = document.getElementById('loading-bar');
+            if(loadingBar) loadingBar.style.width = safePct + '%'; 
+            
+            // Pindahkan dan update teks pada Badge Persentase
+            let badge = document.getElementById('loading-badge');
+            if (badge) {
+                badge.style.left = safePct + '%';
+                badge.innerText = safePct + '%';
+            }
         }
 
         // ==========================================
@@ -1893,13 +2075,13 @@
                 document.getElementById('global-threshold-bar').classList.remove('hidden');
                 document.getElementById('btn-reset').classList.remove('hidden');
                 
+                stopLoadingNotes();
                 overlay.classList.add('hidden');
                 showToast(`Master Update Selesai: ${newAssyCount} Baru, ${updatedAssyCount} Ditimpa.`, 'success');
-                safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
                 
                 if(globalWipData.length > 0) await recalculateValidation();
                 else switchTab('overview');
-            } catch(e) { overlay.classList.add('hidden'); }
+            } catch(e) { stopLoadingNotes(); overlay.classList.add('hidden'); }
         }
 
         const dropZoneWip = document.getElementById('drop-zone-wip'); const fileInputWip = document.getElementById('file-input-wip');
@@ -2040,9 +2222,10 @@
                 updateGlobalThresholdUI(); 
                 
                 await recalculateValidation();
+                stopLoadingNotes();
                 overlay.classList.add('hidden');
                 
-            } catch(e) { overlay.classList.add('hidden'); }
+            } catch(e) { stopLoadingNotes(); overlay.classList.add('hidden'); }
         }
 
         // ==========================================
@@ -2290,10 +2473,11 @@
                 setLoaderState('Menyelesaikan...', 'Merender ulang UI', 99, '');
                 await new Promise(r => setTimeout(r, 100));
 
+                stopLoadingNotes();
                 if(overlay) overlay.classList.add('hidden');
                 refreshDashboards();
                 try { renderControlOutstanding(); } catch(e){}
-            } catch(e) { if(overlay) overlay.classList.add('hidden'); }
+            } catch(e) { stopLoadingNotes(); if(overlay) overlay.classList.add('hidden'); }
         }
 
         // Context Switcher logic
@@ -2869,6 +3053,12 @@
                     dailyHistory[existingHistoryIdx].pct = currentGlobalPct;
                     dailyHistory[existingHistoryIdx].catPct = currentCatPct;
                     if(isFirebaseActive) saveDB('daily_history', dailyHistory); 
+                }
+                
+                // TRIGGER HUJAN BEBEK JIKA TREN >= 90% (Dibatasi 1x setiap 15 detik agar tidak menumpuk)
+                if (currentGlobalPct >= 90 && (Date.now() - window.lastDuckRainTime > 15000)) {
+                    window.lastDuckRainTime = Date.now();
+                    setTimeout(window.triggerDuckRain, 800);
                 }
             }
 

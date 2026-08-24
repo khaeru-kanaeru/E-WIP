@@ -407,6 +407,30 @@
                     <button onclick="downloadOverviewImage()" class="shrink-0 flex items-center gap-1.5 bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-md text-[10px] font-bold shadow transition"><i data-lucide="camera" class="w-3.5 h-3.5"></i> Export Dashboard</button>
                 </div>
 
+                <!-- ALERT NOTIFICATION WPP MISSING STWC -->
+                <div id="overview-stwc-alert" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl shadow-sm flex justify-between items-center cursor-pointer hover:bg-red-100 transition" onclick="openStwcModal()">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-500 animate-pulse"></i>
+                        <div>
+                            <h4 class="text-xs font-black uppercase tracking-wider">Peringatan STWC Belum Ditetapkan!</h4>
+                            <p class="text-[10px] font-medium mt-0.5" id="overview-stwc-alert-text">Terdapat WPP baru yang belum memiliki tanggal STWC.</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-bold bg-red-200 px-2 py-1 rounded text-red-800 whitespace-nowrap">Atur Sekarang &rarr;</span>
+                </div>
+
+                <!-- ALERT NOTIFICATION WPP MISSING STWC -->
+                <div id="overview-stwc-alert" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl shadow-sm flex justify-between items-center cursor-pointer hover:bg-red-100 transition" onclick="openStwcModal()">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-500 animate-pulse"></i>
+                        <div>
+                            <h4 class="text-xs font-black uppercase tracking-wider">Peringatan STWC Belum Ditetapkan!</h4>
+                            <p class="text-[10px] font-medium mt-0.5" id="overview-stwc-alert-text">Terdapat WPP baru yang belum memiliki tanggal STWC.</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-bold bg-red-200 px-2 py-1 rounded text-red-800 whitespace-nowrap">Atur Sekarang &rarr;</span>
+                </div>
+
                 <!-- KPI CARDS -->
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3 shrink-0">
                     <div class="bento-box p-4 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white relative overflow-hidden shadow-lg border-none cursor-pointer hover:scale-[1.02] transition-transform" onclick="openAdvancedDrilldown('TOP_KPI', 'ALL')">
@@ -482,7 +506,9 @@
                                 <h2 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="trending-up" class="w-4 h-4 text-blue-500"></i> Tren Kesehatan WIP (% On-Sched - <span id="daily-trend-title-cat" class="text-blue-600 font-black tracking-widest">ALL</span>)</h2>
                                 <p class="text-[10px] text-gray-500 mt-1">Kalkulasi % On Schedule berbanding Total Load Aktif berdasar riwayat.</p>
                             </div>
-                            <div class="bg-gray-50 px-2 py-1 rounded border border-gray-100 text-[9px] font-bold text-gray-500">HISTORY</div>
+                            <select id="trend-month-filter" onchange="renderOverviewDashboard()" class="bg-white px-2 py-1.5 rounded border border-gray-200 text-[9px] font-bold text-blue-700 outline-none focus:border-brand-500 cursor-pointer shadow-sm uppercase tracking-wider">
+                                <option value="ALL">SEMUA WAKTU</option>
+                            </select>
                         </div>
                         <div class="flex-1 relative w-full min-w-0"><canvas id="chartDailyTrend"></canvas></div>
                     </div>
@@ -705,7 +731,9 @@
                 <table class="w-full text-xs whitespace-nowrap border-collapse text-left">
                     <thead class="bg-gray-100 text-gray-600 sticky top-0 shadow-sm z-10 font-bold uppercase tracking-wider text-[10px]">
                         <tr>
-                            <th class="p-3 border-b border-gray-200">Item ID / Part Name</th>
+                            <th class="p-3 border-b border-gray-200 w-48">
+                                <input type="text" id="filter-sh-name" placeholder="Item ID / Part Name..." onkeyup="renderShMaterials()" class="w-full bg-transparent border-b border-gray-300 outline-none focus:border-amber-500 py-0.5 text-gray-800 placeholder-gray-400">
+                            </th>
                             <th class="p-3 border-b border-gray-200 text-center">
                                 <select id="filter-sh-type" onchange="renderShMaterials()" class="bg-transparent border-b border-gray-300 outline-none cursor-pointer focus:border-amber-500 py-0.5">
                                     <option value="ALL">KATEGORI (SEMUA)</option>
@@ -716,11 +744,19 @@
                                     <option value="Lain-lain">Lain-lain</option>
                                 </select>
                             </th>
-                            <th class="p-3 border-b border-gray-200 text-center">Tgl Input</th>
+                            <th class="p-3 border-b border-gray-200 text-center">
+                                <input type="date" id="filter-sh-date" onchange="renderShMaterials()" class="bg-transparent border-b border-gray-300 outline-none focus:border-amber-500 py-0.5 cursor-pointer text-gray-600">
+                            </th>
                             <th class="p-3 border-b border-gray-200 text-center">Estimasi Kedatangan</th>
-                            <th class="p-3 border-b border-gray-200 text-center">Status</th>
+                            <th class="p-3 border-b border-gray-200 text-center">
+                                <select id="filter-sh-status" onchange="renderShMaterials()" class="bg-transparent border-b border-gray-300 outline-none cursor-pointer focus:border-amber-500 py-0.5">
+                                    <option value="ALL">STATUS (SEMUA)</option>
+                                    <option value="OPEN">OPEN</option>
+                                    <option value="ARRIVED">ARRIVED</option>
+                                </select>
+                            </th>
                             <th class="p-3 border-b border-gray-200 text-right">Terdampak</th>
-                            <th class="p-3 border-b border-gray-200">Remarks (Catatan PPC)</th>
+                            <th class="p-3 border-b border-gray-200">Remarks (Catatan MCL)</th>
                         </tr>
                     </thead>
                     <tbody id="sh-table-body" class="divide-y divide-gray-100 bg-white"></tbody>
@@ -759,7 +795,13 @@
                             <th class="p-3 border-b border-pink-200">Assy No</th>
                             <th class="p-3 border-b border-pink-200 text-center">WP</th>
                             <th class="p-3 border-b border-pink-200 text-right">Sisa Qty DB</th>
-                            <th class="p-3 border-b border-pink-200 text-center">Status WIP</th>
+                            <th class="p-3 border-b border-pink-200 text-center">
+                                <select id="filter-rocket-wip" onchange="renderRocketTable()" class="bg-transparent border-b border-pink-300 outline-none cursor-pointer focus:border-pink-500 py-0.5 font-bold">
+                                    <option value="ALL">STATUS WIP</option>
+                                    <option value="OPEN">OPEN (ALL)</option>
+                                    <option value="CLOSED">CLOSED</option>
+                                </select>
+                            </th>
                             <th class="p-3 border-b border-pink-200">Remarks</th>
                         </tr>
                     </thead>
@@ -1384,6 +1426,28 @@
             let wp = String(wpStr).toUpperCase();
             if(wp.includes('E') || wp.includes('A')) return 'ADD'; if(wp.includes('C')) return 'CAT'; if(wp.includes('/')) return 'REG'; if(wp.includes('S')) return 'SMC'; if(wp.includes('-')) return 'SMV'; return 'OTHER';
         }
+        
+        function getCategorySymbol(catName) {
+            if(catName === 'ADD') return 'E/A';
+            if(catName === 'CAT') return 'C';
+            if(catName === 'REG') return '/';
+            if(catName === 'SMC') return 'S';
+            if(catName === 'SMV') return '-';
+            return '';
+        }
+        
+        function getWorkdayDiff(startDateMs, endDateMs) {
+            let start = new Date(startDateMs); start.setHours(0,0,0,0);
+            let end = new Date(endDateMs); end.setHours(0,0,0,0);
+            let count = 0;
+            let current = new Date(start);
+            while(current < end) {
+                current.setDate(current.getDate() + 1);
+                // Abaikan Minggu (0) dan Sabtu (6)
+                if(current.getDay() !== 0 && current.getDay() !== 6) count++;
+            }
+            return count;
+        }
         function getWPP(wpStr) { let match = String(wpStr).trim().match(/^(\d+)/); return match ? match[1] : wpStr; }
         
         function isDateColumn(headerName) { return dateKeywords.some(kw => String(headerName).toUpperCase().includes(kw)); }
@@ -1753,6 +1817,8 @@
                 switchTab('overview');
             } else { switchTab('master'); }
             
+            await window.checkWeeklyConsolidation();
+            
             stopLoadingNotes();
             if(overlay) overlay.classList.add('hidden');
         };
@@ -1812,6 +1878,7 @@
                     await saveDB('daily_history', []); await saveDB('stwc_settings', {});
                     await saveDB('global_cutoff_key', null); await saveDB('global_delay_key', null); await saveDB('master_headers', []);
                     await saveDB('uploaded_master_files', []); await saveDB('uploaded_wip_files', []);
+                    await saveDB('last_wip_consolidate', null);
                     
                     document.getElementById('nav-center-menus').classList.remove('flex'); document.getElementById('nav-center-menus').classList.add('hidden');
                     document.getElementById('global-threshold-bar').classList.add('hidden');
@@ -1838,12 +1905,52 @@
                 globalWipData = []; uploadedWipFiles = [];
                 try {
                     await saveDB('last_wip_date', null); await saveDB('uploaded_wip_files', []);
+                    await saveDB('last_wip_consolidate', null);
                     safeSetText('info-last-sync', '-');
                     updateWipDependencies(); renderUploadedFiles(); renderOverviewDashboard(); renderReportWIP();
                     showToast('Data WIP Harian telah dikosongkan.', 'success');
                 } catch(e) {}
             }
         }
+
+        window.checkWeeklyConsolidation = async function() {
+            if (!isFirebaseActive) return;
+            if (globalWipData.length === 0) return;
+
+            let todayStr = getTodayDateStr();
+            let isSunday = new Date().getDay() === 0; // 0 adalah hari Minggu
+            let lastConsolidate = await loadDB('last_wip_consolidate');
+
+            // Konsolidasi jika hari Minggu dan belum pernah hari ini, ATAU jika tumpukan file WIP sudah lebih dari 7 (untuk jaga-jaga)
+            if ((isSunday && lastConsolidate !== todayStr && uploadedWipFiles.length > 1) || uploadedWipFiles.length > 7) {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) overlay.classList.remove('hidden');
+                
+                setLoaderState('Pemeliharaan Otomatis...', 'Konsolidasi & Kompresi Data WIP Mingguan', 0, 'Mohon Tunggu');
+
+                let oldFiles = [...uploadedWipFiles];
+
+                // Satukan semua data WIP ke dalam satu bucket "BACKUP_MINGGUAN_WIP"
+                globalWipData.forEach(w => {
+                    w._sourceFile = 'BACKUP_MINGGUAN_WIP';
+                });
+
+                await syncWipToCloud((pct) => {
+                    setLoaderState('Konsolidasi WIP...', 'Menyatukan file harian ke Cloud', pct, 'Optimasi Database');
+                });
+
+                // Hapus rekam jejak file lama dari database Firebase untuk menghemat memori
+                for(let f of oldFiles) {
+                    if(f !== 'BACKUP_MINGGUAN_WIP') {
+                        db.collection("wip_dashboard").doc("wip_file_" + f + "_meta").delete().catch(()=>{});
+                    }
+                }
+
+                await saveDB('last_wip_consolidate', todayStr);
+                renderUploadedFiles();
+                showToast("Konsolidasi Mingguan WIP berhasil! Beban loading aplikasi lebih ringan.", "success");
+            }
+        };
 
         window.repairDatabase = async function() {
             if(!confirm('Jalankan Data Repair Tool? Ini akan menormalkan galat pembacaan QTY dari file Excel.')) return;
@@ -2181,24 +2288,10 @@
                                 
                                 if (wppMatches.length > 0 && wppMatches[0].STWC) {
                                     newMasterObj.STWC = wppMatches[0].STWC;
-                                } else if (!stwcVal) {
-                                    let periodeMatches = globalMasterData.filter(m => m.PERIODE === perStr);
-                                    let periodeSTWCs = periodeMatches.map(m => parseIndoDate(m.STWC)).filter(t => t > 0);
-                                    
-                                    if (periodeSTWCs.length > 0) {
-                                        let maxTime = Math.max(...periodeSTWCs);
-                                        let d = new Date(maxTime + (2 * 86400000)); 
-                                        newMasterObj.STWC = String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
-                                    } else {
-                                        let allSTWCs = globalMasterData.map(m => parseIndoDate(m.STWC)).filter(t => t > 0);
-                                        if(allSTWCs.length > 0) {
-                                            let maxTime = Math.max(...allSTWCs);
-                                            let d = new Date(maxTime + (2 * 86400000));
-                                            newMasterObj.STWC = String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
-                                        } else {
-                                            newMasterObj.STWC = getTodayDateStr().split('-').reverse().join('-');
-                                        }
-                                    }
+                                } else if (stwcVal) {
+                                    newMasterObj.STWC = stwcVal;
+                                } else {
+                                    newMasterObj.STWC = ""; // Kosongkan agar PPIC mengatur manual
                                 }
                                 globalMasterData.push(newMasterObj);
                             }
@@ -2222,6 +2315,9 @@
                 updateGlobalThresholdUI(); 
                 
                 await recalculateValidation();
+                
+                await window.checkWeeklyConsolidation();
+                
                 stopLoadingNotes();
                 overlay.classList.add('hidden');
                 
@@ -2780,6 +2876,90 @@
             let delayIndex = globalUniquePeriodeWPP.indexOf(globalDelayPWKey);
             if(delayIndex === -1) delayIndex = 0;
 
+            // --- STWC MISSING ALERT LOGIC ---
+            let missingStwcWpps = new Set();
+            globalMasterData.forEach(m => {
+                if (m._status !== 'CLOSED' && (!m.STWC || m.STWC === '-' || m.STWC === '')) {
+                    let p = String(m.PERIODE || '-').trim();
+                    let w = getWPP(String(m.WP || '-').trim());
+                    missingStwcWpps.add(`WP ${w} (${p})`);
+                }
+            });
+            let alertEl = document.getElementById('overview-stwc-alert');
+            let alertTextEl = document.getElementById('overview-stwc-alert-text');
+            if (missingStwcWpps.size > 0 && alertEl && alertTextEl) {
+                let missingArr = Array.from(missingStwcWpps).sort();
+                let text = missingArr.slice(0, 3).join(', ');
+                if(missingArr.length > 3) text += ` dan ${missingArr.length - 3} lainnya`;
+                alertTextEl.innerText = `Data baru terdeteksi: ${text}.`;
+                alertEl.classList.remove('hidden');
+            } else if (alertEl) {
+                alertEl.classList.add('hidden');
+            }
+
+            // --- STANDARD FIFO LOGIC ---
+            let timeline = [];
+            
+            // Penentuan separator WP dinamis berdasarkan Filter
+            let wpSep = '/';
+            if (activeOverviewCat === 'SMC') wpSep = 'S';
+            else if (activeOverviewCat === 'CAT') wpSep = 'C';
+            else if (activeOverviewCat === 'SMV') wpSep = '-';
+            else if (activeOverviewCat === 'ADD') wpSep = 'E';
+
+            globalUniquePeriodeWPP.forEach(pwKey => {
+                let [per, wp] = pwKey.split('_');
+                
+                let stwcDateStr = globalSTWCSettings[pwKey];
+                if (!stwcDateStr) {
+                    let matches = globalMasterData.filter(m => m.PERIODE === per && getWPP(String(m.WP||'').trim()) === wp && m.STWC && m.STWC !== '-' && m.STWC !== '');
+                    if (matches.length > 0) stwcDateStr = matches[0].STWC;
+                }
+                if (stwcDateStr) {
+                    timeline.push({ pwKey, per, wp, time: parseIndoDate(stwcDateStr), dateStr: stwcDateStr });
+                }
+            });
+            timeline.sort((a,b) => a.time - b.time);
+
+            let todayTime = new Date().setHours(0,0,0,0);
+            let currentStwcIndex = -1;
+            let daysPassed = 0;
+            
+            for(let i = 0; i < timeline.length; i++) {
+                if (timeline[i].time <= todayTime) {
+                    currentStwcIndex = i;
+                    daysPassed = getWorkdayDiff(timeline[i].time, todayTime);
+                } else {
+                    break;
+                }
+            }
+
+            let textJoint = "-", textCrimp = "-", textCut = "-";
+
+            if (currentStwcIndex !== -1) {
+                let formatLabel = (item) => {
+                    if (!item) return `<span class="text-xl font-black text-white/50 leading-none tracking-tight drop-shadow-sm">Menunggu Data...</span>`;
+                    let shortPer = item.per.length >= 6 ? item.per.slice(4,6) : item.per;
+                    return `<span class="text-2xl font-black text-white leading-none tracking-tight drop-shadow-sm flex items-center">WP ${item.wp}${wpSep}${shortPer} Hari Ke-${daysPassed + 1}</span>`;
+                };
+                textJoint = formatLabel(timeline[currentStwcIndex + 1]);
+                textCrimp = formatLabel(timeline[currentStwcIndex + 2]);
+                textCut   = formatLabel(timeline[currentStwcIndex + 3]);
+            } else if (timeline.length > 0 && timeline[0].time > todayTime) {
+                let formatLabel = (item) => {
+                    if (!item) return `<span class="text-xl font-black text-white/50 leading-none tracking-tight drop-shadow-sm">Menunggu Data...</span>`;
+                    let shortPer = item.per.length >= 6 ? item.per.slice(4,6) : item.per;
+                    return `<span class="text-2xl font-black text-white leading-none tracking-tight drop-shadow-sm flex items-center">WP ${item.wp}${wpSep}${shortPer} Belum Mulai</span>`;
+                };
+                textJoint = formatLabel(timeline[0]);
+                textCrimp = formatLabel(timeline[1]);
+                textCut   = formatLabel(timeline[2]);
+            }
+
+            safeSetHTML('fifo-joint', textJoint);
+            safeSetHTML('fifo-crimping', textCrimp);
+            safeSetHTML('fifo-cutting', textCut);
+
             let activeMasterData = globalMasterData.filter(m => {
                 let rPer = String(m['PERIODE'] || '-').trim();
                 let rWp = getWPP(String(m['WP'] || '-').trim());
@@ -3062,8 +3242,52 @@
                 }
             }
 
-            let dailyLabels = dailyHistory.map(h => h.label);
-            let pctData = dailyHistory.map(h => {
+            // Populate Filter Bulan Dropdown
+            const trendFilterEl = document.getElementById('trend-month-filter');
+            if (trendFilterEl) {
+                let months = new Set();
+                dailyHistory.forEach(h => {
+                    if (h.dateKey) {
+                        let m = h.dateKey.substring(0, 7); // Format: YYYY-MM
+                        months.add(m);
+                    }
+                });
+                
+                let isFirstLoad = !trendFilterEl.hasAttribute('data-init');
+                let currentVal = trendFilterEl.value;
+                let thisMonthStr = getTodayDateStr().substring(0, 7); // Ambil format YYYY-MM hari ini
+                
+                let optHtml = `<option value="ALL">SEMUA WAKTU</option>`;
+                let sortedMonths = Array.from(months).sort().reverse();
+                
+                sortedMonths.forEach(m => {
+                    let [yyyy, mm] = m.split('-');
+                    let mName = new Date(parseInt(yyyy), parseInt(mm)-1, 1).toLocaleDateString('id-ID', {month:'short', year:'numeric'});
+                    optHtml += `<option value="${m}">${mName}</option>`;
+                });
+                trendFilterEl.innerHTML = optHtml;
+                
+                // Logika Default Bulan Saat Ini (Atau bulan terbaru jika bulan ini belum ada datanya)
+                if (isFirstLoad) {
+                    if (months.has(thisMonthStr)) {
+                        trendFilterEl.value = thisMonthStr;
+                    } else if (sortedMonths.length > 0) {
+                        trendFilterEl.value = sortedMonths[0]; 
+                    }
+                    trendFilterEl.setAttribute('data-init', 'true');
+                } else if (months.has(currentVal) || currentVal === 'ALL') {
+                    trendFilterEl.value = currentVal; // Pertahankan pilihan user
+                }
+            }
+
+            let activeMonth = trendFilterEl ? trendFilterEl.value : 'ALL';
+            let filteredHistory = dailyHistory;
+            if (activeMonth !== 'ALL') {
+                filteredHistory = dailyHistory.filter(h => h.dateKey && h.dateKey.startsWith(activeMonth));
+            }
+
+            let dailyLabels = filteredHistory.map(h => h.label);
+            let pctData = filteredHistory.map(h => {
                 if (activeOverviewCat === 'ALL') return h.pct ? h.pct.toFixed(2) : 0;
                 if (h.catPct && h.catPct[activeOverviewCat] !== undefined) return h.catPct[activeOverviewCat].toFixed(2);
                 return h.pct ? h.pct.toFixed(2) : 0;
@@ -4363,13 +4587,34 @@
             if(!tbody) return;
 
             let filterType = document.getElementById('filter-sh-type') ? document.getElementById('filter-sh-type').value : 'ALL';
+            let filterName = document.getElementById('filter-sh-name') ? document.getElementById('filter-sh-name').value.toLowerCase() : '';
+            let filterDate = document.getElementById('filter-sh-date') ? document.getElementById('filter-sh-date').value : '';
+            let filterStatus = document.getElementById('filter-sh-status') ? document.getElementById('filter-sh-status').value : 'ALL';
             
             let filteredSh = globalShMaterials;
+            
             if(filterType !== 'ALL') {
                 filteredSh = filteredSh.filter(sh => sh.type === filterType);
             }
+            if(filterName) {
+                filteredSh = filteredSh.filter(sh => (sh.partName || '').toLowerCase().includes(filterName) || (sh.itemId || '').toLowerCase().includes(filterName));
+            }
+            if(filterDate) {
+                let dParts = filterDate.split('-');
+                if(dParts.length === 3) {
+                    let formattedD = `${dParts[2]}-${dParts[1]}-${dParts[0]}`; // Dari YYYY-MM-DD ke DD-MM-YYYY
+                    filteredSh = filteredSh.filter(sh => sh.tanggalSH === formattedD);
+                }
+            }
+            if(filterStatus !== 'ALL') {
+                filteredSh = filteredSh.filter(sh => {
+                    if (filterStatus === 'ARRIVED') return sh.tanggalKedatangan !== null;
+                    if (filterStatus === 'OPEN') return sh.tanggalKedatangan === null;
+                    return true;
+                });
+            }
 
-            if(filteredSh.length === 0) { 
+            if(filteredSh.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400 font-medium">Tidak ada data SH.</td></tr>`; 
                 return; 
             }
@@ -4631,10 +4876,22 @@
         window.renderRocketTable = function() {
             let html = '';
             let filterVal = document.getElementById('filter-rocket-status').value;
+            let filterWip = document.getElementById('filter-rocket-wip') ? document.getElementById('filter-rocket-wip').value : 'ALL';
             
             let activeRocket = globalAssyRocket;
+            
             if(filterVal !== 'ALL') {
                 activeRocket = activeRocket.filter(r => r.prioritas === filterVal);
+            }
+
+            if (filterWip !== 'ALL') {
+                activeRocket = activeRocket.filter(r => {
+                    let mMatch = globalMasterData.find(m => superCleanAssy(m.ASSY) === r.assy && superCleanAssy(m.WP) === r.wp && m.PERIODE === r.periode);
+                    let statusWip = mMatch ? mMatch._status : 'UNKNOWN';
+                    if (filterWip === 'CLOSED' && statusWip !== 'CLOSED') return false;
+                    if (filterWip === 'OPEN' && statusWip === 'CLOSED') return false;
+                    return true;
+                });
             }
 
             if(activeRocket.length === 0) {

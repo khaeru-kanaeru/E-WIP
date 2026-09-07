@@ -757,6 +757,7 @@
                             </th>
                             <th class="p-3 border-b border-gray-200 text-right">Terdampak</th>
                             <th class="p-3 border-b border-gray-200">Remarks (Catatan MCL)</th>
+                            <th class="p-3 border-b border-gray-200 text-center w-24">PIC Input</th>
                         </tr>
                     </thead>
                     <tbody id="sh-table-body" class="divide-y divide-gray-100 bg-white"></tbody>
@@ -2768,7 +2769,7 @@
             window.currentDrilldownData = [];
 
             // Update Header for Modal
-            let theadHtml = `<tr><th class="w-20">STATUS</th><th class="text-left w-48">ASSY NO</th><th class="w-24 text-left">WP</th><th class="w-20 text-center">PROBLEM</th><th class="w-24 text-center">STWC</th><th class="w-20 text-center">QTY</th><th class="w-20 text-center text-purple-700">QTY CCT</th><th class="w-20 text-center">TOTAL CCT</th><th class="text-left">CUSTOMER</th></tr>`;
+            let theadHtml = `<tr><th class="w-20">STATUS</th><th class="text-left w-48">ASSY NO</th><th class="w-24 text-left">WP</th><th class="w-20 text-center">PROBLEM</th><th class="w-24 text-center">STWC</th><th class="w-20 text-center">QTY</th><th class="w-20 text-center text-purple-700">QTY CCT</th><th class="w-20 text-center">TOTAL CCT</th><th class="text-left w-32">ACTIVE SH</th><th class="text-left w-32">RIWAYAT SH</th><th class="text-left">CUSTOMER</th></tr>`;
             safeSetHTML('drilldown-thead', theadHtml);
 
             filtered.forEach(m => {
@@ -2785,6 +2786,18 @@
                 
                 totalCct += cctDisplay; if(qtyDisplay > 0) qtyArr.push(qtyDisplay);
 
+                let activeShNames = [];
+                let riwayatShNames = [];
+                globalShMaterials.forEach(sh => {
+                    if (sh.targetUids && sh.targetUids.includes(m._uid)) {
+                        if (sh.tanggalKedatangan === null) activeShNames.push(sh.partName);
+                        else riwayatShNames.push(sh.partName);
+                    }
+                });
+                
+                let activeShStr = activeShNames.join(', ') || '-';
+                let riwayatShStr = riwayatShNames.join(', ') || '-';
+
                 window.currentDrilldownData.push({
                     "STATUS": m._status,
                     "ASSY NO": m.ASSY || '-',
@@ -2793,13 +2806,15 @@
                     "QTY": qtyDisplay,
                     "QTY CCT": qtyCctDisplay,
                     "TOTAL CCT": cctDisplay,
+                    "ACTIVE SH": activeShStr,
+                    "RIWAYAT SH": riwayatShStr,
                     "CUSTOMER": m.CUSTOMER || '-'
                 });
 
-                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition drill-row"><td class="p-2.5 text-center stat-cell">${badge}</td><td class="p-2.5 font-bold text-gray-800 assy-cell">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500 wp-cell">${m.WP||'-'}</td><td class="p-2.5 text-center">${problemBadge}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center text-indigo-700 font-bold">${qtyDisplay}</td><td class="p-2.5 text-center text-purple-600 font-bold">${qtyCctDisplay}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${cctDisplay}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px] cust-cell">${m.CUSTOMER||'-'}</td></tr>`;
+                html += `<tr class="border-b border-gray-100 hover:bg-gray-50 transition drill-row"><td class="p-2.5 text-center stat-cell">${badge}</td><td class="p-2.5 font-bold text-gray-800 assy-cell">${m.ASSY||'-'}</td><td class="p-2.5 font-mono text-gray-500 wp-cell">${m.WP||'-'}</td><td class="p-2.5 text-center">${problemBadge}</td><td class="p-2.5 text-center font-bold">${m.STWC||'-'}</td><td class="p-2.5 text-center text-indigo-700 font-bold">${qtyDisplay}</td><td class="p-2.5 text-center text-purple-600 font-bold">${qtyCctDisplay}</td><td class="p-2.5 text-center font-bold text-gray-800 bg-gray-50/50">${cctDisplay}</td><td class="p-2.5 text-left text-[9px] text-red-600 font-bold max-w-[150px] truncate" title="${activeShStr}">${activeShStr}</td><td class="p-2.5 text-left text-[9px] text-emerald-600 font-bold max-w-[150px] truncate" title="${riwayatShStr}">${riwayatShStr}</td><td class="p-2.5 text-gray-600 truncate max-w-[200px] cust-cell">${m.CUSTOMER||'-'}</td></tr>`;
             });
             
-            if(filtered.length === 0) html = '<tr><td colspan="9" class="text-center p-6 text-gray-400 font-medium">Tidak ada data aktif.</td></tr>';
+            if(filtered.length === 0) html = '<tr><td colspan="11" class="text-center p-6 text-gray-400 font-medium">Tidak ada data aktif.</td></tr>';
             
             if (mode === 'SINGLE' && filtered.length > 0) {
                  let m = filtered[0];
@@ -2835,7 +2850,9 @@
                     <th class="p-1"><input type="text" placeholder="Cari Assy..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(1, this.value)"></th>
                     <th class="p-1"><input type="text" placeholder="Cari WP..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(2, this.value)"></th>
                     <th></th><th></th><th></th><th></th><th></th>
-                    <th class="p-1"><input type="text" placeholder="Cari Customer..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(8, this.value)"></th>
+                    <th class="p-1"><input type="text" placeholder="Cari Active SH..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(8, this.value)"></th>
+                    <th class="p-1"><input type="text" placeholder="Cari Riwayat..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(9, this.value)"></th>
+                    <th class="p-1"><input type="text" placeholder="Cari Customer..." class="w-full text-[9px] border px-1.5 py-1 rounded font-normal outline-none focus:border-brand-500" onkeyup="filterDrillTable(10, this.value)"></th>
                 `;
                 thead.appendChild(filterRow);
             }
@@ -3766,12 +3783,78 @@
         }
 
         window.exportMaterialRecapToXLSX = function() {
-            let table = document.getElementById('table-material-recap-export');
-            if(!table) return;
-            let wb = XLSX.utils.table_to_book(table, {sheet: "Shortage_Material_Report"});
-            XLSX.writeFile(wb, `Rekap_Material_Shortage_${getTodayDateStr()}.xlsx`);
-            showToast("Sheet Material Shortage berhasil di-export!", "success");
-        }
+            if(globalShMaterials.length === 0) {
+                showToast("Tidak ada data SH untuk diexport", "warning"); return;
+            }
+            
+            setLoaderState('Menyiapkan Export...', 'Menyusun Multiple Sheet per Material', 50, '');
+            document.getElementById('loading-overlay').classList.remove('hidden');
+
+            setTimeout(() => {
+                try {
+                    let wb = XLSX.utils.book_new();
+
+                    // SHEET 1: REKAP UTAMA
+                    let table = document.getElementById('table-material-recap-export');
+                    if(table) {
+                        let wsOverview = XLSX.utils.table_to_book(table);
+                        XLSX.utils.book_append_sheet(wb, wsOverview, "REKAP_SH_UTAMA");
+                    }
+
+                    // SHEET LANJUTAN: DETAIL PER MATERIAL SH
+                    globalShMaterials.forEach(sh => {
+                        let rawName = sh.partName || sh.itemId || 'Unknown';
+                        // Sheet name max 31 char dan tidak boleh ada karakter khusus tertentu
+                        let sheetName = String(rawName).replace(/[^a-zA-Z0-9 ]/g, "").substring(0, 25);
+                        
+                        let assyList = [];
+                        if(sh.targetUids && sh.targetUids.length > 0) {
+                            sh.targetUids.forEach(uid => {
+                                let m = globalMasterData.find(x => x._uid === uid);
+                                if(m) {
+                                    assyList.push({
+                                        "PERIODE": m.PERIODE || '-',
+                                        "ASSY NO": m.ASSY || '-',
+                                        "WP": m.WP || '-',
+                                        "STWC": m.STWC || '-',
+                                        "QTY DB": m.QTY || 0,
+                                        "STATUS MASTER": m._status || 'OPEN'
+                                    });
+                                }
+                            });
+                        }
+                        
+                        // Urutkan berdasarkan STWC terawal
+                        assyList.sort((a,b) => parseIndoDate(a.STWC) - parseIndoDate(b.STWC));
+                        
+                        if(assyList.length === 0) {
+                            assyList.push({ "INFO": "Tidak ada Assy terdampak yang aktif di Master Database." });
+                        }
+
+                        let ws = XLSX.utils.json_to_sheet(assyList);
+                        
+                        // Menghindari duplikat nama sheet bila ada part name yang sama/mirip
+                        let finalSheetName = sheetName;
+                        let counter = 1;
+                        while(wb.SheetNames.includes(finalSheetName)) {
+                            finalSheetName = sheetName.substring(0, 20) + "_" + counter;
+                            counter++;
+                        }
+
+                        XLSX.utils.book_append_sheet(wb, ws, finalSheetName);
+                    });
+
+                    XLSX.writeFile(wb, `Detail_Material_Shortage_${getTodayDateStr()}.xlsx`);
+                    
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    showToast("Data Shortage per Material berhasil di-export!", "success");
+                } catch(e) {
+                    console.error(e);
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    showToast("Gagal mengekspor file Excel.", "error");
+                }
+            }, 500); // Beri waktu UI untuk update loader bar
+        };
 
         window.exportMaterialRecapToImage = function() {
             const container = document.getElementById('export-recap-container');
@@ -4321,7 +4404,8 @@
                 estimasiKedatangan: estDate || null,
                 remarks: remarks || null,
                 id: Date.now(), 
-                tanggalKedatangan: null
+                tanggalKedatangan: null,
+                inputter: activeUserPin ? AUTH_PROFILES[activeUserPin] : 'Sistem'
             };
 
             globalShMaterials.push(newSh);
@@ -4451,16 +4535,20 @@
                     ${statusBadge}
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                         <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Rentang Periode DB</span>
                         <strong class="text-sm text-gray-800">${sh.startPeriod} - ${sh.endPeriod}</strong>
                     </div>
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Tanggal Ditetapkan (Input)</span>
+                        <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Tanggal Ditetapkan</span>
                         <strong class="text-sm text-gray-800">${sh.tanggalSH}</strong>
                     </div>
-                    <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 relative group">
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                        <span class="text-[10px] uppercase font-bold text-blue-600 block mb-1">PIC (Inputter)</span>
+                        <strong class="text-sm text-blue-900 flex items-center gap-1.5"><i data-lucide="user-check" class="w-4 h-4"></i> ${sh.inputter || 'Sistem'}</strong>
+                    </div>
+                    <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 relative group md:col-span-2">
                         <div class="flex justify-between items-start">
                             <span class="text-[10px] uppercase font-bold text-amber-600 block mb-1">Estimasi Kedatangan</span>
                             ${editBtn}
@@ -4537,6 +4625,10 @@
                 document.getElementById('loading-overlay').classList.remove('hidden');
                 
                 await saveDB('sh_materials', globalShMaterials, (pct) => setLoaderState('Menghapus...', 'Update Database Cloud', pct, 'Proses Delete'));
+                
+                // Kalkulasi ulang efek SH pada seluruh List Assy di Master & WIP
+                await recalculateValidation(); 
+                
                 setLoaderState('Memperbarui UI...', 'Merender ulang Dashboard', 99, '');
                 await new Promise(r => setTimeout(r, 100));
 
@@ -4650,6 +4742,7 @@
                         <div class="text-[9px] text-gray-500 font-bold mt-0.5">CCT: ${cctStr}</div>
                     </td>
                     <td class="p-3 max-w-[200px] truncate text-[9px] text-gray-600 italic align-top">${sh.remarks || '-'}</td>
+                    <td class="p-3 text-center align-top"><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-bold text-[9px] shadow-sm whitespace-nowrap"><i data-lucide="user" class="w-3 h-3 inline mr-0.5"></i> ${sh.inputter || 'Sistem'}</span></td>
                 </tr>`;
             });
             tbody.innerHTML = html;

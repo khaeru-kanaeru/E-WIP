@@ -1239,7 +1239,15 @@
             '110603': 'Adysti E.A.',
             '050205': 'MCL',
             '010625': 'PPIC',
-            '111111': 'Luthfi D.C'
+            '111111': 'Luthfi D.C',
+            '111222': 'Hamdan Fadhly',
+            '222111': 'Slamet Arifin',
+            '121212': 'Angga Erlangga Braja',
+            '212121': 'Kurniawan Nugraha',
+            '122122': 'Ismail Nuryadin',
+            '221221': 'Acep Kunaepi',
+            '122221': 'Wahmi Maulana',
+            '211112': 'Yuyus'
         };
 
         let activeUserPin = null;
@@ -1247,10 +1255,16 @@
         let pendingAllowedPins = [];
 
         window.requireAccess = function(allowedPins, callback) {
-            if (activeUserPin && allowedPins.includes(activeUserPin)) {
+            // Mewariskan Hak Akses Adysti E.A ke Tim Baru secara dinamis
+            let finalAllowed = [...allowedPins];
+            if (finalAllowed.includes('110603')) {
+                finalAllowed.push('111222', '222111', '121212', '212121', '122122', '221221', '122221', '211112');
+            }
+
+            if (activeUserPin && finalAllowed.includes(activeUserPin)) {
                 callback();
             } else {
-                pendingAllowedPins = allowedPins;
+                pendingAllowedPins = finalAllowed;
                 pendingAuthCallback = callback;
                 document.getElementById('auth-pin-input').value = '';
                 document.getElementById('auth-modal').classList.remove('hidden');
@@ -4572,7 +4586,7 @@
                 </div>
                 
                 <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                    <button onclick="requireAccess(['110603', '111111'], () => { promptCaptchaDelete('SH', ${sh.id}); closeShDetailModal(); })" class="text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded font-bold text-xs transition">Hapus Data / Batal</button>
+                    <button onclick="triggerDeleteSh('${sh.id}')" class="text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded font-bold text-xs transition">Hapus Data / Batal</button>
                     ${btnAction}
                 </div>
             `;
@@ -4618,8 +4632,16 @@
             else if(pendingDeleteType === 'ROCKET') window.executeDeleteRocket(pendingDeleteId);
         };
 
+        window.triggerDeleteSh = function(id) {
+            requireAccess(['110603', '111111'], () => { 
+                closeShDetailModal();
+                promptCaptchaDelete('SH', id); 
+            });
+        };
+
         window.executeDeleteSh = async function(id) {
-            globalShMaterials = globalShMaterials.filter(sh => sh.id !== id);
+            // Memaksa komparasi String agar tidak ada miss-type ID
+            globalShMaterials = globalShMaterials.filter(sh => String(sh.id) !== String(id));
             try {
                 setLoaderState('Menghapus...', 'Mengembalikan status data', 0, '');
                 document.getElementById('loading-overlay').classList.remove('hidden');
@@ -4954,8 +4976,14 @@
             showToast('Assy Rocket berhasil ditetapkan!', 'success');
         }
 
+        window.triggerDeleteRocket = function(id) {
+            requireAccess(['110603', '010625', '111111'], () => { 
+                promptCaptchaDelete('ROCKET', id); 
+            });
+        };
+
         window.executeDeleteRocket = async function(id) {
-            globalAssyRocket = globalAssyRocket.filter(r => r.id !== id);
+            globalAssyRocket = globalAssyRocket.filter(r => String(r.id) !== String(id));
             await saveDB('assy_rocket', globalAssyRocket);
             await recalculateValidation();
             renderRocketTable();
@@ -5015,7 +5043,7 @@
 
                     html += `
                     <tr class="border-b border-gray-100 transition ${bgRow}">
-                        <td class="p-2 text-center align-middle"><button onclick="requireAccess(['110603', '010625', '111111'], () => promptCaptchaDelete('ROCKET', ${r.id}))" class="text-gray-400 hover:text-red-600 bg-white border px-2 py-1 rounded shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>
+                        <td class="p-2 text-center align-middle"><button onclick="triggerDeleteRocket('${r.id}')" class="text-gray-400 hover:text-red-600 bg-white border px-2 py-1 rounded shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>
                         <td class="p-2 text-center align-middle">${prioritasBadge}</td>
                         <td class="p-2 text-center text-pink-700 font-black align-middle"><i data-lucide="rocket" class="w-3 h-3 inline mr-1"></i> ${r.stwc}</td>
                         <td class="p-2 text-center font-bold text-gray-600 align-middle">${r.periode}</td>

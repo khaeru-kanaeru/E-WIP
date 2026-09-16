@@ -588,10 +588,10 @@
                         <strong id="info-master-count" class="text-indigo-800 text-lg font-black leading-none mt-1">0 <span class="text-xs font-bold">Assy</span></strong>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="resetMasterData()" class="px-4 py-2 bg-white hover:bg-red-50 text-red-600 font-bold rounded-lg border border-red-100 shadow-sm flex items-center gap-1.5 transition">
+                        <button onclick="requireSuperAdmin(resetMasterData)" class="px-4 py-2 bg-white hover:bg-red-50 text-red-600 font-bold rounded-lg border border-red-100 shadow-sm flex items-center gap-1.5 transition">
                             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Kosongkan Master
                         </button>
-                        <button onclick="resetData()" id="btn-reset" class="hidden px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition">
+                        <button onclick="requireSuperAdmin(resetData)" id="btn-reset" class="hidden px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition">
                             <i data-lucide="power" class="w-3.5 h-3.5"></i> Factory Reset Total
                         </button>
                     </div>
@@ -2054,21 +2054,23 @@
             lucide.createIcons();
         }
 
-        async function removeMasterFile(filename) {
-            if(confirm(`Yakin ingin MENCABUT seluruh data yang berasal dari file: ${filename}?`)) {
-                globalMasterData = globalMasterData.filter(m => m._sourceFile !== filename);
-                uploadedMasterFiles = uploadedMasterFiles.filter(f => f !== filename);
-                try {
-                    await db.collection("wip_dashboard").doc("master_file_" + filename + "_meta").delete().catch(()=>{});
-                    await syncMasterToCloud();
-                    safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
-                    renderUploadedFiles();
-                    try { setupControlHeaders(); } catch(e){}
-                    await recalculateValidation();
-                    showToast(`Data dari file ${filename} berhasil dicabut.`, 'success');
-                } catch(e) {}
-            }
-        }
+        window.removeMasterFile = function(filename) {
+            requireSuperAdmin(async () => {
+                if(confirm(`Yakin ingin MENCABUT seluruh data yang berasal dari file: ${filename}?`)) {
+                    globalMasterData = globalMasterData.filter(m => m._sourceFile !== filename);
+                    uploadedMasterFiles = uploadedMasterFiles.filter(f => f !== filename);
+                    try {
+                        await db.collection("wip_dashboard").doc("master_file_" + filename + "_meta").delete().catch(()=>{});
+                        await syncMasterToCloud();
+                        safeSetText('info-master-count', globalMasterData.length.toLocaleString() + ' Assy');
+                        renderUploadedFiles();
+                        try { setupControlHeaders(); } catch(e){}
+                        await recalculateValidation();
+                        showToast(`Data dari file ${filename} berhasil dicabut.`, 'success');
+                    } catch(e) {}
+                }
+            });
+        };
 
         async function removeWipFile(filename) {
             if(confirm(`Yakin ingin MENCABUT data WIP yang berasal dari file: ${filename}?`)) {
@@ -2084,12 +2086,34 @@
             }
         }
         
+        // ==========================================
+        // FUNGSI OTORISASI SUPER ADMIN KHUSUS
+        // ==========================================
+        window.requireSuperAdmin = function(callback) {
+            let code = prompt("RESTRICTED AREA: Masukkan kode Super Admin untuk mengeksekusi perintah ini:");
+            if (code === "EKAGANTENG2026") {
+                callback();
+            } else if (code !== null && code !== "") {
+                showToast("Kode Super Admin Salah! Akses Ditolak.", "error");
+            }
+        };
+
         const dropZoneMaster = document.getElementById('drop-zone-master'); const fileInputMaster = document.getElementById('file-input-master');
-        dropZoneMaster.addEventListener('click', () => fileInputMaster.click());
+        
+        // Gembok event Click
+        dropZoneMaster.addEventListener('click', () => requireSuperAdmin(() => fileInputMaster.click()));
+        
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => { dropZoneMaster.addEventListener(e, preventD, false); document.body.addEventListener(e, preventD, false); });
         ['dragenter', 'dragover'].forEach(e => dropZoneMaster.addEventListener(e, () => dropZoneMaster.classList.add('drag-active'), false));
         ['dragleave', 'drop'].forEach(e => dropZoneMaster.addEventListener(e, () => dropZoneMaster.classList.remove('drag-active'), false));
-        dropZoneMaster.addEventListener('drop', (e) => { if(e.dataTransfer.files.length > 0) processMasterFiles(e.dataTransfer.files); });
+        
+        // Gembok event Drag & Drop
+        dropZoneMaster.addEventListener('drop', (e) => { 
+            if(e.dataTransfer.files.length > 0) {
+                requireSuperAdmin(() => processMasterFiles(e.dataTransfer.files));
+            }
+        });
+        
         fileInputMaster.addEventListener('change', (e) => { if(e.target.files.length > 0) processMasterFiles(e.target.files); });
 
         async function processMasterFiles(files) {

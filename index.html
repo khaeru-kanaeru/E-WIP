@@ -2146,7 +2146,7 @@
                 overlay.classList.add('hidden');
                 showToast(`Master Update Selesai: ${newAssyCount} Baru, ${updatedAssyCount} Ditimpa.`, 'success');
                 
-                if(globalWipData.length > 0) await recalculateValidation();
+                if(globalWipData.length > 0) await recalculateValidation(true); // Render dari cloud, jangan diupload balik!
                 else switchTab('overview');
             } catch(e) { stopLoadingNotes(); overlay.classList.add('hidden'); }
         }
@@ -2350,8 +2350,8 @@
 
             try {
                 await saveDB('stwc_settings', globalSTWCSettings);
-                await syncMasterToCloud();
-                await recalculateValidation(); 
+                // Kita menghapus syncMasterToCloud disini, cukup kalkulasi UI saja
+                await recalculateValidation(true); 
                 closeStwcModal();
                 showToast('Konfigurasi STWC Berhasil Diterapkan.', 'success');
             } catch(e) { document.getElementById('loading-overlay').classList.add('hidden'); }
@@ -2409,7 +2409,7 @@
             if(isReport) renderReportWIP();
         }
 
-        async function recalculateValidation() {
+        async function recalculateValidation(skipMasterSync = false) {
             if(!isFirebaseActive) return;
             if (globalMasterData.length === 0) return;
 
@@ -2530,9 +2530,12 @@
             }
 
             try {
-                await syncMasterToCloud((pct) => {
-                    setLoaderState('Update Database...', 'Sinkronisasi Override Status Master', 20 + Math.floor(pct * 0.7), 'Tahap Sinkronisasi');
-                });
+                // PENGHEMATAN KUOTA 99%: Kita hanya me-sync Master jika sedang memproses file WIP/Master baru
+                if (!skipMasterSync) {
+                    await syncMasterToCloud((pct) => {
+                        setLoaderState('Update Database...', 'Sinkronisasi Override Status Master', 20 + Math.floor(pct * 0.7), 'Tahap Sinkronisasi');
+                    });
+                }
                 await saveDB('daily_history', dailyHistory);
                 setLoaderState('Menyelesaikan...', 'Merender ulang UI', 99, '');
                 await new Promise(r => setTimeout(r, 100));
@@ -4666,7 +4669,7 @@
                 </div>
                 
                 <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                    <button onclick="triggerDeleteSh(${sh.id})" class="text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded font-bold text-xs transition">Hapus Data / Batal</button>
+                    <button onclick="requireAccess(['110603', '111111'], () => executeDeleteSh(${sh.id}))" class="text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded font-bold text-xs transition">Hapus Data / Batal</button>
                     ${btnAction}
                 </div>
             `;
@@ -4676,68 +4679,48 @@
         }
         window.closeShDetailModal = function() { document.getElementById('sh-detail-modal').classList.add('hidden'); }
 
+        // ==========================================================
+        // MESIN HAPUS & KEDATANGAN SH (ANTI QUOTA-EXCEEDED & BYPASS CAPTCHA)
+        // ==========================================================
         let pendingDeleteType = null;
         let pendingDeleteId = null;
         let currentCaptchaCode = '';
 
+        // BYPASS CAPTCHA - LANGSUNG EKSEKUSI AGAR CEPAT DAN TIDAK ERROR
         window.promptCaptchaDelete = function(type, id) {
-            pendingDeleteType = type;
-            pendingDeleteId = id;
-            currentCaptchaCode = 'HAPUS-' + (Math.floor(Math.random() * 9000) + 1000);
-            
-            document.getElementById('captcha-text').innerText = currentCaptchaCode;
-            document.getElementById('captcha-input').value = '';
-            document.getElementById('captcha-delete-modal').classList.remove('hidden');
-            setTimeout(() => document.getElementById('captcha-input').focus(), 100);
+            if(type === 'SH') window.executeDeleteSh(id);
+            else if(type === 'ROCKET') window.executeDeleteRocket(id);
         };
-
-        window.closeCaptchaModal = function() {
-            document.getElementById('captcha-delete-modal').classList.add('hidden');
-            pendingDeleteType = null;
-            pendingDeleteId = null;
-            currentCaptchaCode = '';
-        };
-
-        window.verifyCaptcha = function() {
-            let input = document.getElementById('captcha-input').value.trim().toUpperCase();
-            if(input !== currentCaptchaCode) {
-                showToast("Kode Captcha Tidak Sesuai!", "error");
-                document.getElementById('captcha-input').value = '';
-                document.getElementById('captcha-input').focus();
-                return;
-            }
-            
-            closeCaptchaModal();
-            if(pendingDeleteType === 'SH') window.executeDeleteSh(pendingDeleteId);
-            else if(pendingDeleteType === 'ROCKET') window.executeDeleteRocket(pendingDeleteId);
-        };
+        window.closeCaptchaModal = function() { document.getElementById('captcha-delete-modal').classList.add('hidden'); };
+        window.verifyCaptcha = function() {};
 
         window.triggerDeleteSh = function(id) {
-            // Konversi ke string mutlak sebelum dikirim ke Captcha
-            let safeId = String(id);
             requireAccess(['110603', '111111'], () => { 
                 closeShDetailModal();
-                promptCaptchaDelete('SH', safeId); 
+                window.executeDeleteSh(id); 
             });
         };
 
         window.executeDeleteSh = async function(id) {
-            // Memaksa komparasi String agar tidak ada miss-type ID
-            globalShMaterials = globalShMaterials.filter(sh => String(sh.id) !== String(id));
+            if(!confirm("Yakin ingin menghapus / membatalkan data Shortage ini?")) return;
+
+            // Memaksa komparasi String dan Number agar 100% terhapus dari memori
+            let originalCount = globalShMaterials.length;
+            globalShMaterials = globalShMaterials.filter(sh => String(sh.id) !== String(id) && sh.id !== Number(id));
+            
+            if(globalShMaterials.length === originalCount) {
+                showToast("Data sudah tidak ada di memori.", "warning"); return;
+            }
+
             try {
-                setLoaderState('Menghapus...', 'Mengembalikan status data', 0, '');
+                setLoaderState('Menghapus...', 'Update Database Cloud', 50, 'Anti Quota-Exceeded');
                 document.getElementById('loading-overlay').classList.remove('hidden');
                 
-                await saveDB('sh_materials', globalShMaterials, (pct) => setLoaderState('Menghapus...', 'Update Database Cloud', pct, 'Proses Delete'));
+                // MENGHENTIKAN RECALCULATE MASTER! Kita hanya simpan list SH saja (Sangat ringan).
+                await saveDB('sh_materials', globalShMaterials);
                 
-                // Kalkulasi ulang efek SH pada seluruh List Assy di Master & WIP
-                await recalculateValidation(); 
-                
-                setLoaderState('Memperbarui UI...', 'Merender ulang Dashboard', 99, '');
-                await new Promise(r => setTimeout(r, 100));
-
+                // Merender ulang Dashboard secara visual saja
                 renderShMaterials();
-                
                 if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
                 if(!document.getElementById('view-report').classList.contains('hidden')) renderReportWIP();
                 if(!document.getElementById('view-control').classList.contains('hidden')) renderControlOutstanding();
@@ -4747,23 +4730,23 @@
             } catch(e) {
                 console.error(e);
                 document.getElementById('loading-overlay').classList.add('hidden');
-                showToast("Gagal menghapus data.", "error");
+                showToast("Gagal menghapus data ke Cloud.", "error");
             }
         };
-        
 
         window.confirmArrival = function(id) {
             requireAccess(['050205', '110603', '111111'], async () => {
                 let dateStr = prompt("Tanggal Part Aktual Datang (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
                 if(dateStr) {
-                    let item = globalShMaterials.find(x => x.id === id);
+                    let item = globalShMaterials.find(x => String(x.id) === String(id));
                     if(item) { 
                         item.tanggalKedatangan = dateStr; 
                         
-                        setLoaderState('Menyimpan...', 'Update Kedatangan Material', 0, '');
+                        setLoaderState('Menyimpan...', 'Update Kedatangan Material', 50, '');
                         document.getElementById('loading-overlay').classList.remove('hidden');
                         
-                        await saveDB('sh_materials', globalShMaterials, (pct) => setLoaderState('Menyimpan...', 'Update Database Cloud', pct, 'Proses Set Kedatangan'));
+                        // MENGHENTIKAN RECALCULATE MASTER!
+                        await saveDB('sh_materials', globalShMaterials);
                         
                         renderShMaterials(); 
                         if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
@@ -4789,16 +4772,12 @@
             
             let filteredSh = globalShMaterials;
             
-            if(filterType !== 'ALL') {
-                filteredSh = filteredSh.filter(sh => sh.type === filterType);
-            }
-            if(filterName) {
-                filteredSh = filteredSh.filter(sh => (sh.partName || '').toLowerCase().includes(filterName) || (sh.itemId || '').toLowerCase().includes(filterName));
-            }
+            if(filterType !== 'ALL') { filteredSh = filteredSh.filter(sh => sh.type === filterType); }
+            if(filterName) { filteredSh = filteredSh.filter(sh => (sh.partName || '').toLowerCase().includes(filterName) || (sh.itemId || '').toLowerCase().includes(filterName)); }
             if(filterDate) {
                 let dParts = filterDate.split('-');
                 if(dParts.length === 3) {
-                    let formattedD = `${dParts[2]}-${dParts[1]}-${dParts[0]}`; // Dari YYYY-MM-DD ke DD-MM-YYYY
+                    let formattedD = `${dParts[2]}-${dParts[1]}-${dParts[0]}`; 
                     filteredSh = filteredSh.filter(sh => sh.tanggalSH === formattedD);
                 }
             }
@@ -4815,7 +4794,6 @@
                 return; 
             }
             
-            // Sort: OPEN on top, then by Date
             filteredSh.sort((a,b) => {
                 if (a.tanggalKedatangan === null && b.tanggalKedatangan !== null) return -1;
                 if (a.tanggalKedatangan !== null && b.tanggalKedatangan === null) return 1;
@@ -4975,9 +4953,7 @@
             } else {
                 window.tempRocketValidated.forEach((d, i) => {
                     let isClosed = d.status === 'CLOSED';
-                    let badge = isClosed ? '<span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">CLOSED</span>' : '<span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">OPEN</span>';
-                    let btn = `<button onclick="removeRocketTemp('${d.uid}')" class="text-gray-400 hover:text-red-600 bg-white border px-2 py-1 rounded shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>`;
-                    
+                                        
                     let selU = d.prioritas === 'Urgent' ? 'selected' : '';
                     let selTU = d.prioritas === 'Top Urgent' ? 'selected' : '';
                     let selR = d.prioritas === 'Rocket' ? 'selected' : '';
@@ -5050,7 +5026,7 @@
             });
 
             await saveDB('assy_rocket', globalAssyRocket, (pct) => setLoaderState('Menyimpan...', 'Upload Rocket ke Cloud', pct, 'Tahap 1 dari 2'));
-            await recalculateValidation(); // Ini mengaplikasikan perubahan Rocket STWC
+            await recalculateValidation(true); // Menerapkan visual STWC dengan instan tanpa overload DB
             renderRocketTable();
             closeRocketModal();
             
@@ -5065,15 +5041,22 @@
         };
 
         window.executeDeleteRocket = async function(id) {
-            globalAssyRocket = globalAssyRocket.filter(r => String(r.id) !== String(id));
-            await saveDB('assy_rocket', globalAssyRocket);
-            await recalculateValidation();
-            renderRocketTable();
+            if(!confirm("Yakin ingin mencabut status Rocket dari Assy ini?")) return;
             
+            globalAssyRocket = globalAssyRocket.filter(r => String(r.id) !== String(id));
+            
+            setLoaderState('Menghapus...', 'Update Database Cloud', 50, 'Anti Quota-Exceed');
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            
+            // HANYA MENGUPDATE ROCKET. Mematikan recalculateValidation()!
+            await saveDB('assy_rocket', globalAssyRocket);
+            
+            renderRocketTable();
             if(!document.getElementById('view-overview').classList.contains('hidden')) renderOverviewDashboard();
             if(!document.getElementById('view-control').classList.contains('hidden')) renderControlOutstanding();
             
-            showToast('Status Rocket dihapus', 'success');
+            document.getElementById('loading-overlay').classList.add('hidden');
+            showToast('Status Rocket berhasil dihapus', 'success');
         }
 
         window.renderRocketTable = function() {
@@ -5125,7 +5108,7 @@
 
                     html += `
                     <tr class="border-b border-gray-100 transition ${bgRow}">
-                        <td class="p-2 text-center align-middle"><button onclick="triggerDeleteRocket('${r.id}')" class="text-gray-400 hover:text-red-600 bg-white border px-2 py-1 rounded shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>
+                        <td class="p-2 text-center align-middle"><button onclick="requireAccess(['110603', '010625', '111111'], () => executeDeleteRocket('${r.id}'))" class="text-gray-400 hover:text-red-600 bg-white border px-2 py-1 rounded shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>
                         <td class="p-2 text-center align-middle">${prioritasBadge}</td>
                         <td class="p-2 text-center text-pink-700 font-black align-middle"><i data-lucide="rocket" class="w-3 h-3 inline mr-1"></i> ${r.stwc}</td>
                         <td class="p-2 text-center font-bold text-gray-600 align-middle">${r.periode}</td>
